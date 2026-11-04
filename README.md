@@ -31,6 +31,14 @@ verification, binding, then `submitShares(Q)`). The SRA's calls and events carry
 (`_quarterOf`) counts from 0 at activation. What the backup sends, and when, is computed from the SRA's own schedule
 (`lib/chain.js`).
 
+**Email alerts**: [`alerts-service/`](alerts-service/README.md) is a small container (for DigitalOcean) that runs the
+sign-up (double opt-in) and mails subscribers. With the variable `ALERT_SERVICE_URL` and the secret
+`ALERT_SERVICE_TOKEN` set, it gets: the absence alerts, failed SRA/SWA/f02 messages, contract upgrades and owner
+changes, gaps in the record, Claim checks that do not match, and backup-sender sends and failures, all mainnet only and
+throttled per alert. `bin/watch.js` also sends a heartbeat each run, so the watchtower itself going quiet for three
+hours is an email. Set `ALERTS_URL` in `site/index.html` to show the sign-up form on the page, and the variable
+`WATCHTOWER_PAGE_URL` so emails link to the hosted page.
+
 Needs Node.js 22 or newer.
 
 | Command | What it does |

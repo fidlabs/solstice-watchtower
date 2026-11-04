@@ -34,6 +34,11 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write # to commit the record; this job holds no private key
+    env:
+      # The email alert service (alerts-service/): optional; without it, alerts go to Slack and the log only.
+      ALERT_SERVICE_URL: ${{ vars.ALERT_SERVICE_URL }}
+      ALERT_SERVICE_TOKEN: ${{ secrets.ALERT_SERVICE_TOKEN }}
+      WATCHTOWER_PAGE_URL: ${{ vars.WATCHTOWER_PAGE_URL }}
     steps:
       # ref: main, not the commit that triggered the run: a run that waited in the concurrency queue must start from the
       # previous run's push, or its own push is refused (seen 2026-09-28 00:30 UTC, two runs started at the same moment).
@@ -97,6 +102,10 @@ jobs:
     environment: production
     permissions:
       contents: read
+    env:
+      ALERT_SERVICE_URL: ${{ vars.ALERT_SERVICE_URL }}
+      ALERT_SERVICE_TOKEN: ${{ secrets.ALERT_SERVICE_TOKEN }}
+      WATCHTOWER_PAGE_URL: ${{ vars.WATCHTOWER_PAGE_URL }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

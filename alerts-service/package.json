@@ -1,0 +1,11 @@
+{
+  "name": "solstice-alerts-service",
+  "private": true,
+  "type": "module",
+  "description": "Email sign-up (double opt-in) and throttled alert fan-out through Resend. No dependencies.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
