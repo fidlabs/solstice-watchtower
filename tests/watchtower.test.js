@@ -177,7 +177,7 @@ test('slack text: one message per run, notable records only, reverted and gap ma
   assert.match(slackText(records, { network: 'mainnet' }, 1, 5), /solsticewatchtower\.eth\.limo\/$/) // mainnet is the default view
   const withTx = [{ kind: 'event', epoch: 1, time: t, source: 'SRA', name: 'VolumePosted', fields: { q: 1 }, tx: '0xabc' }]
   assert.match(slackText(withTx, { network: 'calibnet' }, 1, 1), /<https:\/\/calibration\.filfox\.info\/en\/message\/0xabc\|message>/)
-  assert.doesNotMatch(slackText(withTx, { network: 'butterfly-gamma' }, 1, 1), /filfox/) // no explorer on butterflynet
+  assert.doesNotMatch(slackText(withTx, { network: 'devnet' }, 1, 1), /filfox/) // no explorer for an unknown network
 })
 
 test('slack outbox: a failed post is kept in status.slackPending and sent first at the next run', async () => {

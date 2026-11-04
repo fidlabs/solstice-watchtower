@@ -93,17 +93,10 @@ const STALE_MINUTES = 30
 // live read of f02. The other views are fixed records.
 const LIVE = ['mainnet', 'calibnet']
 // The views, each with the note shown on top. mainnet is the default since 2026-10-16 (the activation week).
-// The sample and real-test views were removed 2026-09-22, the butterfly gamma view 2026-10-16 (its network is gone);
-// their records stay in the repo.
 const VIEWS = { mainnet: 'mainnet', calibnet: 'calibnet' }
-// The calibnet contracts were redeployed on 2026-09-22 (solstice PR #83). The record of the first deployment is frozen in
-// this folder and shown at the bottom of the calibnet history.
-const OLD_CALIBNET = { dir: 'data/calibnet-2026-09-17/', label: 'Deploy of 2026-09-17, replaced on 2026-09-22 (solstice PR #83)',
-  note: 'These rows are from the SRA 0xeDfCd0947F7E9d58E0035f032520d75ce8eCA451 and SWA 0xDE4fBd083F18f96C241DdE0A83C3EDC422Be9BA6 deployed on 2026-09-17 ' +
-    'and replaced by a redeploy at new addresses on 2026-09-22. Nothing carries over: the admitted lists and pricing params set here on 2026-09-21 must be set again on the new contracts.' }
 const NOTES = {
   calibnet: 'Calibnet, the live record. Contracts redeployed on 2026-09-22 (SRA 0x0339f205…96a9, SWA 0x66C11A9F…1421); FIP-0118 activates at epoch 4109134 (Mon 2026-09-28 13:00 UTC), ' +
-    'with 1-day quarters and a 6-hour SWA_TIMELOCK. The history of the first deployment is at the bottom of part 2.',
+    'with 1-day quarters and a 6-hour SWA_TIMELOCK.',
   mainnet: 'MAINNET. The SRA and SWA were deployed on 2026-09-22 at the same addresses as on calibnet. FIP-0118 activates at epoch 6470280 (Mon 2026-10-19 13:00 UTC, ' +
     'Lotus v1.37.0 upgrade epoch 6470279); before it, f02 has no queue and this page shows only the deployment events and governance actions. Quarters of 262,974 epochs (about 91 days), 7-day SWA_TIMELOCK.',
 }
@@ -144,13 +137,6 @@ async function main() {
   let from = 'the copy published with this page'
   const [status, text] = await (useRepo ? load(REPO_RAW).then((x) => (from = 'the repo', x)).catch(() => load('')) : load(''))
   const records = text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).sort((a, b) => a.epoch - b.epoch)
-  // The frozen record of the replaced calibnet deployment, shown as the last group of part 2 (repo first, else bundled).
-  let oldRecords = []
-  if (dataset === 'calibnet') {
-    const loadOld = (base) => fetch(base + OLD_CALIBNET.dir + 'records.jsonl').then((r) => r.ok ? r.text() : Promise.reject(r.status))
-    const oldText = await (useRepo ? loadOld(REPO_RAW).catch(() => loadOld('')) : loadOld('')).catch(() => '')
-    oldRecords = oldText.split('\n').filter(Boolean).map((l) => JSON.parse(l)).sort((a, b) => a.epoch - b.epoch)
-  }
   records0 = records
   const nowEpoch = () => Math.floor((Date.now() / 1000 - status.genesisTimestamp) / status.epochSeconds)
   const quarterStart = (q) => status.activationEpoch + (q - 1) * status.epochsPerQuarter
@@ -158,7 +144,7 @@ async function main() {
   const quarterNow = status.activationEpoch && nowEpoch() >= status.activationEpoch ? Math.floor((nowEpoch() - status.activationEpoch) / status.epochsPerQuarter) + 1 : 0
 
   $('net').textContent = status.network
-  document.body.dataset.net = status.network.startsWith('butterfly') ? 'butterfly' : status.network === 'mainnet' ? 'mainnet' : 'calibnet'
+  document.body.dataset.net = status.network === 'mainnet' ? 'mainnet' : 'calibnet'
   explorer = status.network === 'mainnet' ? 'https://filfox.info/en/message/' : 'https://calibration.filfox.info/en/message/'
   $('views').innerHTML = 'You are looking at <b>' + esc(status.network) + '</b>. Other networks: ' +
     Object.entries(VIEWS).map(([k, v]) => k === dataset ? `<a class="here">${v}</a>` : `<a href="${k === 'mainnet' ? '?' : `?data=${k}`}">${v}</a>`).join(' | ')
@@ -224,13 +210,7 @@ async function main() {
       const body = rows.filter((r) => r.quarter === q).reverse().map(landedRow).join('')
       return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${rows.filter((r) => r.quarter === q).length})</span></summary>
         <div class="scroll"><table><tr><th>time</th><th>source</th><th>what</th><th>result</th><th>link</th></tr>${body}</table></div></details>`
-    }).join('') + oldGroup(source, onlyBad)
-  }
-  function oldGroup(source, onlyBad) {
-    const rows = oldRecords.filter((r) => (r.kind !== 'read' || r.name === 'claim check') && (!source || r.source === source || r.kind === 'gap') && (!onlyBad || r.ok === false))
-    if (!rows.length) return ''
-    return `<details class="quarter"><summary>${esc(OLD_CALIBNET.label)} <span class="muted">(${rows.length})</span></summary><div class="banner">${esc(OLD_CALIBNET.note)}</div>
-      <div class="scroll"><table><tr><th>time</th><th>source</th><th>what</th><th>result</th><th>link</th></tr>${rows.reverse().map(landedRow).join('')}</table></div></details>`
+    }).join('')
   }
   $('fSource').onchange = $('fBad').onchange = renderLanded
   renderLanded()
