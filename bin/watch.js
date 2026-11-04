@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeRpc } from '../lib/chain.js'
 import { absenceFindings, throttle } from '../lib/absence.js'
-import { alert } from '../lib/notify.js'
+import { alert, heartbeat } from '../lib/notify.js'
 
 const cfg = JSON.parse(readFileSync(process.argv[2] ?? 'config/calibnet.json', 'utf8'))
 const rpc = makeRpc(cfg.rpcUrl)
@@ -30,4 +30,6 @@ const before = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}
 const { send, sent } = throttle(findings, before)
 for (const f of send) await alert(f, cfg)
 writeFileSync(path, JSON.stringify(sent, null, 2) + '\n')
+// The alert service raises its own alarm when this goes quiet for 3x the interval: the watchtower itself stopped.
+await heartbeat(cfg, `Solstice watchtower (${cfg.network})`, cfg.heartbeatSeconds ?? 3600)
 if (findings.length) process.exitCode = 1

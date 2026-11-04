@@ -76,6 +76,15 @@
   <h2>3. State</h2>
   <div class="muted">Values that leave no event. Each line shows the last value read and when it last changed.</div>
   <div id="state"></div>
+  <section id="alerts" hidden>
+    <h2>Email alerts</h2>
+    <div class="muted">Get an email when something needs attention on mainnet: submitShares or the gate check overdue, a failed
+      SRA/SWA/f02 message, a contract upgrade or owner change, a gap in the record, or the watchtower itself going quiet.
+      A confirmation link comes first; every email has an unsubscribe link.</div>
+    <form id="alertsForm"><input type="email" name="email" required placeholder="you@example.org" autocomplete="email">
+      <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px">
+      <button type="submit">Subscribe</button> <span id="alertsMsg" class="muted"></span></form>
+  </section>
   <footer class="muted"><div id="netnote"></div><div id="foot"></div></footer>
 </main>
 
@@ -89,6 +98,9 @@ import { decodeStreamsState, computeWeight as weightNow, fromBase64 } from './li
 // this page was published long ago; the copy bundled next to the page is the fallback.
 const REPO_RAW = 'https://raw.githubusercontent.com/fidlabs/solstice-watchtower/main/site/'
 const STALE_MINUTES = 30
+// The email alert service (alerts-service/). Empty: the sign-up form stays hidden. Its ALLOWED_ORIGINS must include
+// the origin this page is served from.
+const ALERTS_URL = ''
 // Views of a network the scheduled job still watches: they get the repo fetch, the "reader stopped" warning and the
 // live read of f02. The other views are fixed records.
 const LIVE = ['mainnet', 'calibnet']
@@ -444,6 +456,19 @@ let explorer = 'https://calibration.filfox.info/en/message/'
 const msgLink = (id) => explorer + id
 
 main().catch((err) => { $('head').textContent = `Could not load ${dir}: ${err.message}` })
+
+if (ALERTS_URL) {
+  $('alerts').hidden = false
+  $('alertsForm').onsubmit = async (ev) => {
+    ev.preventDefault()
+    const f = new FormData(ev.target)
+    $('alertsMsg').textContent = 'sending…'
+    try {
+      const res = await fetch(ALERTS_URL.replace(/\/+$/, '') + '/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: f.get('email'), website: f.get('website') }) })
+      $('alertsMsg').textContent = (await res.json()).message ?? (res.ok ? 'Check your inbox.' : 'Could not subscribe.')
+    } catch { $('alertsMsg').textContent = 'Could not reach the alert service. Try again later.' }
+  }
+}
 </script>
 </body>
 </html>

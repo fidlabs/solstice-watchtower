@@ -185,6 +185,7 @@ test('slack outbox: a failed post is kept in status.slackPending and sent first 
   process.env.SLACK_RETRY_MS = '1'
   const sent = []
   let fail = true
+  const realFetch = global.fetch
   global.fetch = async (url, { body }) => { if (fail) throw new Error('down'); sent.push(JSON.parse(body).text); return { ok: true } }
   const t = '2026-09-28T13:04:00.000Z'
   const rec = (name) => [{ kind: 'event', epoch: 1, time: t, source: 'SRA', name, fields: {} }]
@@ -198,6 +199,7 @@ test('slack outbox: a failed post is kept in status.slackPending and sent first 
   assert.deepEqual(sent.map((x) => /VolumePosted|SharesSubmitted/.exec(x)[0]), ['VolumePosted', 'SharesSubmitted'])
   assert.deepEqual(status.slackPending, [])
   delete process.env.SLACK_WEBHOOK
+  global.fetch = realFetch
 })
 
 test('backup cranker: what is due comes from chain state and the binding epoch alone', () => {
@@ -247,4 +249,40 @@ test('absence: reminders are throttled, escalations go at once, and recoveries a
   const done = throttle([], first.sent, t0 + 60e3)
   assert.deepEqual(done.send.map((f) => f.title), ['resolved: submitShares(1) has landed'])
   assert.deepEqual(done.sent, {})
+})
+
+test('email: only failures, control changes, gaps and claim mismatches are worth an email', async () => {
+  const { emailWorthy } = await import('../lib/notify.js')
+  assert.equal(emailWorthy({ kind: 'message', source: 'SRA', name: 'submitShares', ok: false, error: 'NotBound(2)' }).severity, 'warn')
+  assert.equal(emailWorthy({ kind: 'message', source: 'SRA', name: 'submitShares', ok: true }), null)
+  assert.ok(emailWorthy({ kind: 'event', source: 'SRA', name: 'Upgraded', fields: {} }))
+  assert.ok(emailWorthy({ kind: 'event', source: 'SWA', name: 'OwnerReplaced', fields: {} }))
+  assert.equal(emailWorthy({ kind: 'event', source: 'SRA', name: 'VolumePosted', fields: {} }), null)
+  assert.ok(emailWorthy({ kind: 'gap', source: 'reader', name: 'could not be read', fields: { fromEpoch: 1, toEpoch: 2 } }))
+  assert.ok(emailWorthy({ kind: 'read', name: 'claim check', fields: { matches: false } }))
+  assert.equal(emailWorthy({ kind: 'read', name: 'claim check', fields: { matches: true } }), null)
+})
+
+test('email: alerts and heartbeats reach the service with the token; an opted-out network sends nothing', async () => {
+  const { createServer } = await import('node:http')
+  const got = []
+  const server = createServer((req, res) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { got.push({ path: req.url, auth: req.headers.authorization, body: JSON.parse(b) }); res.end('{}') }) })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  const saved = { ...process.env }
+  process.env.ALERT_SERVICE_URL = `http://127.0.0.1:${server.address().port}/`
+  process.env.ALERT_SERVICE_TOKEN = 'tok'
+  delete process.env.SLACK_WEBHOOK
+  try {
+    const { alert, heartbeat, emailRecords } = await import('../lib/notify.js')
+    await alert({ severity: 'critical', title: 'submitShares(1) has not landed', text: 'x', key: 'submitShares(1)' }, { network: 'mainnet' })
+    await heartbeat({ network: 'mainnet' }, 'Solstice watchtower (mainnet)', 3600)
+    await emailRecords([{ kind: 'event', epoch: 5, time: '2027-01-01T00:00:00.000Z', source: 'SRA', name: 'Upgraded', fields: {}, tx: '0xabc' }, { kind: 'event', epoch: 6, time: '2027-01-01T00:00:00.000Z', source: 'SRA', name: 'VolumePosted', fields: {} }], { network: 'mainnet' })
+    await alert({ severity: 'warn', title: 'quiet' }, { network: 'calibnet', notify: false })
+    assert.deepEqual(got.map((g) => [g.path, g.auth]), [['/api/alerts', 'Bearer tok'], ['/api/heartbeat', 'Bearer tok'], ['/api/alerts', 'Bearer tok']])
+    assert.deepEqual([got[0].body.key, got[0].body.severity], ['mainnet:submitShares(1)', 'critical'])
+    assert.equal(got[2].body.key, 'mainnet:Upgraded:0xabc')
+  } finally {
+    process.env = saved
+    server.close()
+  }
 })
