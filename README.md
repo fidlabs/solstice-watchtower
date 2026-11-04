@@ -52,10 +52,11 @@ A scheduled workflow (`.github/workflows/read.yml`, every 10 minutes, plus an ou
   record. Keys: `CRANK_KEY_MAINNET`, `CLAIM_KEY_MAINNET` (and `CRANK_KEY`, `CLAIM_KEY` for calibnet); without them, dry
   runs.
 
-Quarter numbers everywhere follow the SRA (what executes): quarter q starts at `activationEpoch + q * epochsPerQuarter`,
-and quarter q's cycle -- posting, verification, binding, `submitShares(q)` -- runs at its start. FIP-0118 §2.2 numbers
-the same span q+1. Records written before 2026-11 carry a `quarter` field in FIP numbering; the page recomputes the
-quarter from each record's epoch.
+Quarter numbers are FIP-0118 §2.2's, as in the FIP, the fpv-indexer and the record: quarter Q starts at
+`activationEpoch + (Q-1) * epochsPerQuarter`, and quarter Q's activity settles inside quarter Q+1 (posting,
+verification, binding, then `submitShares(Q)`). The SRA's calls and events carry the same Q; only its internal index
+(`_quarterOf`) counts from 0 at activation. What the backup sends, and when, is computed from the SRA's own schedule
+(`lib/chain.js`).
 
 Needs Node.js 22 or newer.
 

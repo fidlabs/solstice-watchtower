@@ -321,10 +321,10 @@ for (const [label, address] of Object.entries(cfg.wallets)) {
 }
 const sra = [...contracts].find(([, n]) => n === 'SRA')?.[0]
 if (sra) {
-  const q = quarterOf(cfg, chainHead) ?? 0 // the SRA's own quarter number: quarter q's cycle runs now
+  const q = quarterOf(cfg, chainHead)
   await read('SRA', 'SRA admittedCount', () => view(sra, 'admittedCount'))
   await read('SRA', 'SRA orchestratorCount', () => view(sra, 'orchestratorCount'))
-  for (const past of [q, q - 1].filter((x) => x >= 1)) {
+  for (const past of [q - 1, q - 2].filter((x) => x >= 1)) {
     await read('SRA', `SRA aggregatedFilecoinPayVolume(${past})`, () => view(sra, 'aggregatedFilecoinPayVolume', [BigInt(past)]))
   }
   // Per-Orchestrator posted value for the current quarter and the last one (fpvOf), and the Orchestrator each

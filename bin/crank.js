@@ -7,7 +7,7 @@
 // calibnet, one day on mainnet), which leaves the primary cranker (fidlabs/solstice-cranker) time to act first.
 // The delay is measured from the binding epoch, which is a pure function of the chain and the config, so nothing has to
 // be remembered between runs: a run that cannot save state can never reset the clock and keep the backup from firing.
-// Quarter numbers are the SRA's (lib/chain.js). Without CRANK_KEY the run is a dry run. Exit 1 when something failed.
+// Quarter numbers are FIP-0118's, as the SRA's call arguments (lib/chain.js). Without CRANK_KEY the run is a dry run. Exit 1 when something failed.
 import { readFileSync } from 'node:fs'
 import { createPublicClient, createWalletClient, http, encodeFunctionData, parseEther, formatEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -46,7 +46,7 @@ const GATE = 0xf9abab00248d945495524c8caf6be2b837274c1becd1964fb3775f62fd6e4600n
 const lastChecked = Number((await word(cfg.swa, '0x' + GATE.toString(16))) & 0xffffffffffffffffn)
 const steps = Number((await word(cfg.swa, '0x' + (GATE + 3n).toString(16))) & 0xffffffffffffffffn)
 const { quarter: q, latestBound, due: calls } = dueCalls(cfg, { head, lastSubmitted, lastChecked, steps })
-console.log(`${cfg.network} epoch ${head} (quarter ${q ?? 'before activation'}) · latest bound ${latestBound ?? '-'} · lastSubmittedQuarter ${lastSubmitted} · gate lastCheckedQuarter ${lastChecked}, steps ${steps} · ${account ? 'key ' + account.address : 'DRY RUN, no key'}`)
+console.log(`${cfg.network} epoch ${head} (quarter ${q || 'before activation'}) · latest bound ${latestBound ?? '-'} · lastSubmittedQuarter ${lastSubmitted} · gate lastCheckedQuarter ${lastChecked}, steps ${steps} · ${account ? 'key ' + account.address : 'DRY RUN, no key'}`)
 const due = calls.map((c) => ({ ...c, to: c.name === 'submitShares' ? cfg.sra : cfg.swa }))
 if (!due.length) console.log('nothing due')
 

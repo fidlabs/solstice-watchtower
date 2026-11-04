@@ -153,14 +153,9 @@ async function main() {
   }
   records0 = records
   const nowEpoch = () => Math.floor((Date.now() / 1000 - status.genesisTimestamp) / status.epochSeconds)
-  // Quarter numbers follow the SRA (what executes): quarter q starts at activationEpoch + q * EPOCHS_PER_QUARTER, and
-  // quarter q's cycle (posting, verification, binding, submitShares(q)) runs at its start. Records are grouped by this
-  // number recomputed from their epoch; the `quarter` field stored in records before 2026-11 used FIP-0118's
-  // numbering (one higher) and is ignored.
-  const quarterStart = (q) => status.activationEpoch + q * status.epochsPerQuarter
-  const quarterAt = (e) => (!status.activationEpoch || e < status.activationEpoch ? null : Math.floor((e - status.activationEpoch) / status.epochsPerQuarter))
+  const quarterStart = (q) => status.activationEpoch + (q - 1) * status.epochsPerQuarter
   const epochTime = (e) => new Date((status.genesisTimestamp + e * status.epochSeconds) * 1000).toISOString()
-  const quarterNow = quarterAt(nowEpoch())
+  const quarterNow = status.activationEpoch && nowEpoch() >= status.activationEpoch ? Math.floor((nowEpoch() - status.activationEpoch) / status.epochsPerQuarter) + 1 : 0
 
   $('net').textContent = status.network
   document.body.dataset.net = status.network.startsWith('butterfly') ? 'butterfly' : status.network === 'mainnet' ? 'mainnet' : 'calibnet'
@@ -168,7 +163,7 @@ async function main() {
   $('views').innerHTML = 'You are looking at <b>' + esc(status.network) + '</b>. Other networks: ' +
     Object.entries(VIEWS).map(([k, v]) => k === dataset ? `<a class="here">${v}</a>` : `<a href="${k === 'mainnet' ? '?' : `?data=${k}`}">${v}</a>`).join(' | ')
   $('head').innerHTML = `last epoch read ${status.lastEpoch} (${utc(epochTime(status.lastEpoch))}) · ` +
-    (quarterNow !== null ? `quarter ${quarterNow} now` : 'before activation') + ` · <a href="${dir}records.jsonl">record file</a>`
+    (quarterNow ? `quarter ${quarterNow} now` : 'before activation') + ` · <a href="${dir}records.jsonl">record file</a>`
   // The network note is background, not a warning: it sits in the footer. Only warnings (the stopped reader) go on top.
   if (NOTES[dataset]) $('netnote').innerHTML = `<p><b>About this network.</b> ${esc(NOTES[dataset])}</p>`
   $('head').innerHTML += ` · record from ${from}`
@@ -222,13 +217,12 @@ async function main() {
   function renderLanded() {
     const source = $('fSource').value, onlyBad = $('fBad').checked
     const rows = records.filter((r) => (r.kind !== 'read' || r.name === 'claim check') && (!source || r.source === source || r.kind === 'gap') && (!onlyBad || r.ok === false))
-    const quarters = [...new Set(rows.map((r) => quarterAt(r.epoch)))].sort((a, b) => (b ?? -1) - (a ?? -1))
+    const quarters = [...new Set(rows.map((r) => r.quarter))].sort((a, b) => b - a)
     $('landed').innerHTML = rows.length === 0 ? '<p>Nothing yet.</p>' : quarters.map((q, i) => {
-      const label = q === null ? 'Before activation' :
-        `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` + (q === 0 ? ' · activation span, no cycle' : ` · cycle of quarter ${q}`)
-      const inQ = rows.filter((r) => quarterAt(r.epoch) === q)
-      const body = inQ.slice().reverse().map(landedRow).join('')
-      return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${inQ.length})</span></summary>
+      const label = q === 0 ? 'Before activation' :
+        `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` + (q === 1 ? ' · no settlement cycle (quarter 1 settles in quarter 2)' : ` · settlement cycle of quarter ${q - 1}`)
+      const body = rows.filter((r) => r.quarter === q).reverse().map(landedRow).join('')
+      return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${rows.filter((r) => r.quarter === q).length})</span></summary>
         <div class="scroll"><table><tr><th>time</th><th>source</th><th>what</th><th>result</th><th>link</th></tr>${body}</table></div></details>`
     }).join('') + oldGroup(source, onlyBad)
   }
@@ -309,15 +303,15 @@ function glanceStreams(live, nowEpoch) {
   $('glanceStreams').innerHTML = `<b>Streams:</b> ${live.streams.length} · ${kinds.join(' · ')}<br>${glanceOrch}`
 }
 
-// At a glance, row 2: where the chain is in the current quarter q (the SRA's number). Quarter q's own cycle runs at
-// its start (SRA: "Quarter anchor E = FIP-0118 Start(q+1), where quarter q's cycle opens"): POST_PERIOD, then
-// VERIFICATION_WINDOW, then quarter q binds and submitShares(q) and the gate check for q can run. Quarter 0 has no cycle.
-// The last REGISTRATION_CUTOFF epochs before quarterStart(q+1) are marked: a pair registered there applies only from
-// quarter q+1. The cutoff in force is the last PricingParamsUpdated before quarterStart(q).
+// At a glance, row 2: where the chain is in the current quarter Q. The cycle of quarter Q-1 runs inside quarter Q
+// (SRA: "Quarter anchor E = FIP-0118 Start(q+1), where quarter q's cycle opens"): POST_PERIOD, then VERIFICATION_WINDOW,
+// then the value binds and SubmitShares and the gate check can run. The last REGISTRATION_CUTOFF epochs before
+// Start(Q+1) are marked: a pair registered there applies only from Start(Q+1) and covers nothing of quarter Q. The cutoff in force is the last
+// PricingParamsUpdated before Start(Q) (a parameter applies from the next quarter's first epoch).
 function glanceQuarter(status, records, nowEpoch, epochTime, quarterStart) {
   const now = nowEpoch(), A = status.activationEpoch, L = status.epochsPerQuarter
   if (!A || now < A) { $('glanceQuarter').innerHTML = `<div class="glance-row"><b>Quarter:</b> before activation (activation epoch ${A || 'not chosen'})</div>`; return }
-  const q = Math.floor((now - A) / L), s = quarterStart(q), e = quarterStart(q + 1)
+  const Q = Math.floor((now - A) / L) + 1, s = quarterStart(Q), e = quarterStart(Q + 1)
   const P = status.postPeriod, V = status.verificationWindow
   const priced = records.filter((r) => r.kind === 'event' && r.name === 'PricingParamsUpdated' && r.epoch < s).at(-1)
   const cutoff = priced ? Number(priced.fields.registrationCutoff) : 0
@@ -329,21 +323,23 @@ function glanceQuarter(status, records, nowEpoch, epochTime, quarterStart) {
   const phases = []
   const phaseRow = (cls, from, to, label) => phases.push(`<li class="${now >= from && now < to ? 'here' : ''}"><span class="dot ${cls}"></span>${hhmm(from)} to ${hhmm(to)} UTC · ${label}${now >= from && now < to ? ' (now)' : ''}</li>`)
   let segs
-  if (q === 0) { segs = seg('seg-none', L - cutoff, 'no cycle in quarter 0'); phaseRow('seg-none', s, e - cutoff, 'activation span: no posting cycle (quarter 1 posts at the start of quarter 1)') }
-  else if (!P || !V) { segs = seg('seg-none', L - cutoff, `cycle of Q${q}`); phaseRow('seg-none', s, e - cutoff, `cycle of Q${q} (windows known after the next reader run)`) }
+  if (Q === 1) { segs = seg('seg-none', L - cutoff, 'no cycle in Q1'); phaseRow('seg-none', s, e - cutoff, 'no posting cycle in Q1 (Q1 posts in Q2)') }
+  else if (!P || !V) { segs = seg('seg-none', L - cutoff, `cycle of Q${Q - 1}`); phaseRow('seg-none', s, e - cutoff, `cycle of Q${Q - 1} (windows known after the next reader run)`) }
   else {
-    segs = seg('seg-post', P, `POST_PERIOD Q${q}`) + seg('seg-verify', V, `VERIFICATION_WINDOW Q${q}`) + seg('seg-bound', L - P - V - cutoff, `Q${q} bound`)
-    phaseRow('seg-post', s, s + P, `POST_PERIOD for Q${q}`)
-    phaseRow('seg-verify', s + P, s + P + V, `VERIFICATION_WINDOW for Q${q}`)
-    phaseRow('seg-bound', s + P + V, e - cutoff, `Q${q} bound: submitShares(${q}) and gate check`)
+    segs = seg('seg-post', P, `POST_PERIOD Q${Q - 1}`) + seg('seg-verify', V, `VERIFICATION_WINDOW Q${Q - 1}`) + seg('seg-bound', L - P - V - cutoff, `Q${Q - 1} bound`)
+    phaseRow('seg-post', s, s + P, `POST_PERIOD for Q${Q - 1}`)
+    phaseRow('seg-verify', s + P, s + P + V, `VERIFICATION_WINDOW for Q${Q - 1}`)
+    phaseRow('seg-bound', s + P + V, e - cutoff, `Q${Q - 1} bound: submitShares(${Q - 1}) and gate check`)
   }
   segs += seg('seg-cut', cutoff, 'REGISTRATION_CUTOFF')
-  if (cutoff) phaseRow('seg-cut', e - cutoff, e, `REGISTRATION_CUTOFF (${cutoff} epochs): a pair registered here applies from Q${q + 1}`)
-  const phase = q === 0 ? 'activation span, no posting cycle' : !P || !V ? '' : now < s + P ? `POST_PERIOD for Q${q} until ${utc(epochTime(s + P))}` : now < s + P + V ? `VERIFICATION_WINDOW for Q${q} until ${utc(epochTime(s + P + V))}` : `Q${q} bound at ${utc(epochTime(s + P + V))}: submitShares(${q}) and gate check open`
-  const inCut = cutoff && now >= e - cutoff ? ` · inside REGISTRATION_CUTOFF: a pair registered now applies from ${utc(epochTime(e))} and covers nothing of Q${q}` : ''
-  $('glanceQuarter').innerHTML = `<div class="glance-row"><b>Quarter:</b> Q${q} · ${phase}${inCut}</div>` +
+  if (cutoff) phaseRow('seg-cut', e - cutoff, e, `REGISTRATION_CUTOFF (${cutoff} epochs): a pair registered here applies from Q${Q + 1}`)
+  const phase = Q === 1 ? 'bootstrap, no posting cycle' : !P || !V ? '' : now < s + P ? `POST_PERIOD for Q${Q - 1} until ${utc(epochTime(s + P))}` : now < s + P + V ? `VERIFICATION_WINDOW for Q${Q - 1} until ${utc(epochTime(s + P + V))}` : `Q${Q - 1} bound at ${utc(epochTime(s + P + V))}: submitShares(${Q - 1}) and gate check open`
+  // FIP-0118 §2.2: a registration applies from its execution epoch (back-cover to the quarter's first epoch); one made in
+  // [Start(Q+1) - REGISTRATION_CUTOFF, Start(Q+1)) applies from Start(Q+1) and covers nothing of quarter Q.
+  const inCut = cutoff && now >= e - cutoff ? ` · inside REGISTRATION_CUTOFF: a pair registered now applies from ${utc(epochTime(e))} and covers nothing of Q${Q}` : ''
+  $('glanceQuarter').innerHTML = `<div class="glance-row"><b>Quarter:</b> Q${Q} · ${phase}${inCut}</div>` +
     `<div class="bar">${segs}<div class="now" style="left:${pct(now - s)}" title="now, epoch ${now}"></div></div>` +
-    `<ul class="phases">${phases.join('')}</ul><div class="muted" style="font-size:12px">Q${q}: ${utc(epochTime(s))} to ${utc(epochTime(e))}${cutoff ? '' : ' · REGISTRATION_CUTOFF not set'}</div>`
+    `<ul class="phases">${phases.join('')}</ul><div class="muted" style="font-size:12px">Q${Q}: ${utc(epochTime(s))} to ${utc(epochTime(e))}${cutoff ? '' : ' · REGISTRATION_CUTOFF not set'}</div>`
 }
 
 // At a glance, the gate line: what the next QuarterlyGateCheck will compare. The SWA has no getter for its gate
@@ -418,12 +414,12 @@ const KNOWN = {
 }
 function glanceParams(status, records, nowEpoch, epochTime, quarterStart) {
   const now = nowEpoch(), A = status.activationEpoch, L = status.epochsPerQuarter, sec = status.epochSeconds
-  const active = A && now >= A, Q = active ? Math.floor((now - A) / L) : null
-  const boundary = active ? quarterStart(Q) : Infinity // before activation every event applies from activation
+  const active = A && now >= A, Q = active ? Math.floor((now - A) / L) + 1 : 0
+  const boundary = active ? quarterStart(Q) : Infinity // before activation every event applies from Q1
   const label = (a) => { const k = (KNOWN[status.network] ?? {})[a.toLowerCase()]; return `<code>${a.slice(0, 6)}…${a.slice(-4)}</code>${k ? ' ' + k : ''}` }
   const hours = (n) => { const h = n * sec / 3600, d = +(h / 24).toFixed(2); return h >= 24 ? `${d} ${d === 1 ? 'day' : 'days'}` : `${+h.toFixed(2)} h` }
   const pick = (name) => { const ev = records.filter((r) => r.kind === 'event' && r.name === name); return { cur: ev.filter((r) => r.epoch < boundary).at(-1), next: ev.filter((r) => r.epoch >= boundary).at(-1) } }
-  const since = (r, fromNext) => !r ? '' : active ? (fromNext ? `pending: applies from ${utc(epochTime(quarterStart(Q + 1)))}` : `since ${utc(r.time)}`) : `set ${utc(r.time)}, applies from activation`
+  const since = (r, fromNext) => !r ? '' : active ? (fromNext ? `pending: applies from ${utc(epochTime(quarterStart(Q + 1)))}` : `since ${utc(r.time)}`) : `set ${utc(r.time)}, applies from Q1`
   const rows = []
   const row = (name, value, when) => rows.push(`<tr><td>${name}</td><td>${value}</td><td class="muted">${when}</td></tr>`)
   const lists = pick('AdmittedListsUpdated'), price = pick('PricingParamsUpdated'), gate = records.filter((r) => r.kind === 'event' && r.name === 'GateParamsSet').at(-1)
@@ -457,9 +453,10 @@ function footnote(live, status) {
   if (t === undefined || !status.activationEpoch) return
   const d = Math.abs(t - status.activationEpoch)
   const rel = d === 0 ? 'equal' : d === 1 ? 'one epoch apart, which changes nothing here' : `<span class="bad">${d} epochs apart, which is unexpected</span>`
-  $('foot').innerHTML = `Quarter numbers on this page follow the SRA: quarter q starts at activationEpoch + q · EPOCHS_PER_QUARTER (FIP-0118 numbers the same span q+1), with activationEpoch ${status.activationEpoch} ` +
-    `from solstice deployments.json. f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
-    `The two are ${rel}. FIP-0118 §2.4.10 expects them equal.`
+  $('foot').innerHTML = `Quarter numbers on this page follow FIP-0118 §2.2: Start(Q) = activationEpoch + (Q-1) · EPOCHS_PER_QUARTER, with activationEpoch ${status.activationEpoch} ` +
+    `from solstice deployments.json. Quarter Q's activity settles inside quarter Q+1, and the SRA's calls and events for it carry Q (submitShares(Q), SharesSubmitted(Q)); the SRA's internal quarter index (_quarterOf) counts from 0 at activation, one lower than the number here. ` +
+    `f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
+    `activationEpoch and t_start are ${rel}. FIP-0118 §2.4.10 expects them equal.`
 }
 
 // Filfox accepts both 0x transaction hashes and message CIDs. The host is set per network when the record loads.

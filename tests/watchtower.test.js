@@ -14,15 +14,16 @@ import { slackText, notify } from '../lib/notify.js'
 const cfg = JSON.parse(readFileSync(new URL('../config/calibnet.json', import.meta.url), 'utf8'))
 const stepTo15 = dagCbor.encode([[[2, flat(15n, 4100000)]]]) // payload of a StepWeightRecords write: stream 2 to 15%
 
-test('quarter numbers follow the SRA: quarter q starts at ACTIVATION_EPOCH + q * EPOCHS_PER_QUARTER', () => {
+test('quarter numbers are FIP-0118 §2.2\'s; quarter Q settles, and binds, inside quarter Q+1', () => {
   const c = { activationEpoch: 1000, epochsPerQuarter: 2880, postPeriod: 240, verificationWindow: 480 }
-  assert.equal(quarterOf(c, 999), null) // before activation
-  assert.equal(quarterOf(c, 1000), 0) // activation opens quarter 0, as the SRA's _quarterOf says
-  assert.equal(quarterOf(c, 1000 + 2879), 0)
-  assert.equal(quarterOf(c, 1000 + 2880), 1) // quarterStart(1): quarter 1's cycle opens
-  assert.equal(quarterOf({ activationEpoch: 0, epochsPerQuarter: 2880 }, 5000), null) // activation epoch not chosen yet
-  assert.equal(quarterStart(c, 1), 3880)
-  assert.equal(bindingEpoch(c, 1), 3880 + 240 + 480) // submitShares(1) becomes callable here
+  assert.equal(quarterOf(c, 999), 0) // before activation
+  assert.equal(quarterOf(c, 1000), 1) // activation opens quarter 1 (the SRA's internal index calls it 0)
+  assert.equal(quarterOf(c, 1000 + 2879), 1)
+  assert.equal(quarterOf(c, 1000 + 2880), 2) // Start(2): quarter 1's settlement cycle opens (the SRA's quarterStart(1))
+  assert.equal(quarterOf({ activationEpoch: 0, epochsPerQuarter: 2880 }, 5000), 0) // activation epoch not chosen yet
+  assert.equal(quarterStart(c, 2), 3880)
+  assert.equal(bindingEpoch(c, 1), 3880 + 240 + 480) // submitShares(1) becomes callable here, inside quarter 2
+  assert.equal(dueCalls(c, { head: 3880 + 720, lastSubmitted: 0, lastChecked: 1, steps: 0 }).quarter, 2)
 })
 
 test('f02 event: write-queued for a gate step', () => {
@@ -202,10 +203,10 @@ test('slack outbox: a failed post is kept in status.slackPending and sent first 
 test('backup cranker: what is due comes from chain state and the binding epoch alone', () => {
   const c = { activationEpoch: 1000, epochsPerQuarter: 2880, postPeriod: 240, verificationWindow: 480 }
   const b1 = bindingEpoch(c, 1) // 4600
-  // before activation, and in quarter 0: nothing to submit (quarter 0 never is); the gate starts at lastChecked 1
+  // before activation, and in quarter 1: nothing to submit yet; the gate starts at lastChecked 1
   assert.deepEqual(dueCalls(c, { head: 900, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due, [])
   assert.deepEqual(dueCalls(c, { head: 3000, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due, [])
-  // quarter 1 started but not bound yet: still nothing
+  // quarter 2 started (quarter 1's cycle) but quarter 1 not bound yet: still nothing
   assert.deepEqual(dueCalls(c, { head: b1 - 1, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due.map((d) => d.key), [])
   // quarter 1 bound: submitShares(1), possible since its binding. The gate waits for quarter 2.
   const d = dueCalls(c, { head: b1, lastSubmitted: 0, lastChecked: 1, steps: 0 })
