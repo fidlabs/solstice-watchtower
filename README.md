@@ -38,22 +38,31 @@ the SWA were deployed on calibnet on 2026-09-17 and redeployed on 2026-09-22; th
 Mon 2026-09-28 13:00 UTC. Until then the real record holds the deployment events and the reads, and f02 has no queue. The
 "sample" and "real test" views were removed from the page on 2026-09-22; the real views are calibnet and the two butterflynet test networks.*
 
-A scheduled job (`.github/workflows/read.yml`) runs the reader every 15 minutes (started by an outside timer) and commits the records to
-`site/data/calibnet/`, `site/data/mainnet/` and `site/data/butterfly-gamma/`. The reader only reads from a public endpoint and holds no key.
+A scheduled workflow (`.github/workflows/read.yml`, every 10 minutes, plus an outside timer) has two jobs:
 
-The same job ends with a backup cranker (`bin/crank.js`, since 2026-10-08): on calibnet it sends `submitShares(q)` and
-`quarterlyGateCheck()` when a call has been possible for 30 minutes and nobody sent it, so the primary cranker
-(https://github.com/decentramike/solstice-cranker) goes first. It needs the repository secret `CRANK_KEY` (a calibnet
-account used for nothing else); without it, it only simulates. A second step (`bin/claim.js`, since 2026-10-12) sends
-the f02 `Claim` once a day for every wallet that has something to collect; its key is the secret `CLAIM_KEY`, an f1
-account. Both steps also run for mainnet (secrets `CRANK_KEY_MAINNET`, `CLAIM_KEY_MAINNET`; dry runs until the
-secrets exist). Details in DESIGN.md.
+- **read** (can push, holds no key): the reader appends what landed to `site/data/<network>/records.jsonl` and commits
+  it; `bin/watch.js` then checks the chain for overdue calls and alerts (`submitShares(q)` not landed
+  `absenceAlertHours` after binding, critical past the backup delay or in the last week of the window; the gate check
+  after `gateAlertHours`). Mainnet and calibnet are separate steps: one failing never skips the other.
+- **backup** (holds the keys, cannot push, environment `production`): the backup cranker (`bin/crank.js`) sends
+  `submitShares(q)` / `quarterlyGateCheck()` once the quarter has been bound for `crankDelayEpochs` (one day on mainnet)
+  and nobody sent it, so the primary cranker (https://github.com/fidlabs/solstice-cranker) goes first. The Claim keeper
+  (`bin/claim.js`) claims every owed wallet when nobody has claimed the stream for `claimEveryHours`. Both cap their
+  fees, and neither keeps state between runs: the delay is measured from the binding epoch, the Claim interval from the
+  record. Keys: `CRANK_KEY_MAINNET`, `CLAIM_KEY_MAINNET` (and `CRANK_KEY`, `CLAIM_KEY` for calibnet); without them, dry
+  runs.
+
+Quarter numbers are FIP-0118 §2.2's, as in the FIP, the fpv-indexer and the record: quarter Q starts at
+`activationEpoch + (Q-1) * epochsPerQuarter`, and quarter Q's activity settles inside quarter Q+1 (posting,
+verification, binding, then `submitShares(Q)`). The SRA's calls and events carry the same Q; only its internal index
+(`_quarterOf`) counts from 0 at activation. What the backup sends, and when, is computed from the SRA's own schedule
+(`lib/chain.js`).
 
 Needs Node.js 22 or newer.
 
 | Command | What it does |
 |---|---|
-| `npm install` | Installs the two libraries (`viem`, `@ipld/dag-cbor`). Once. |
+| `npm ci` | Installs the three libraries (`viem`, `iso-filecoin`, `@ipld/dag-cbor`). Once. |
 | `npm run read` | One run of the reader against calibnet. Only reads from the public RPC endpoint. Appends to `site/data/calibnet/records.jsonl`. |
 | `npm run sample` | Writes a SAMPLE record to `site/data/sample/` for local development (`?data=sample` is no longer linked from the page). |
 | `npm run page` | Serves the page at http://localhost:8000 (sample view: http://localhost:8000/?data=sample). Stop with Ctrl+C. |

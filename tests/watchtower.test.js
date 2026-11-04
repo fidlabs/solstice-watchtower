@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import * as dagCbor from '@ipld/dag-cbor'
 import { encodeFunctionData, encodeErrorResult } from 'viem'
-import { quarterOf, epochToTime } from '../lib/chain.js'
+import { quarterOf, quarterStart, bindingEpoch, dueCalls, epochToTime } from '../lib/chain.js'
 import { decodeActorEvent, decodeStreamsState, decodeF02Params, computeWeight, bigFromBytes, idToEthAddress, writeOutcome } from '../site/lib/f02.js'
 import { abi, decodeLog, decodeCall, decodeRevert } from '../lib/evm.js'
 import { PCT, entry, idAddress, tokenBytes, flat, sampleLog } from './samples.js'
@@ -14,15 +14,16 @@ import { slackText, notify } from '../lib/notify.js'
 const cfg = JSON.parse(readFileSync(new URL('../config/calibnet.json', import.meta.url), 'utf8'))
 const stepTo15 = dagCbor.encode([[[2, flat(15n, 4100000)]]]) // payload of a StepWeightRecords write: stream 2 to 15%
 
-test('quarter numbers follow Start(Q) = ACTIVATION_EPOCH + (Q-1) * EPOCHS_PER_QUARTER', () => {
-  const c = { activationEpoch: 1000, epochsPerQuarter: 2880 }
+test('quarter numbers are FIP-0118 §2.2\'s; quarter Q settles, and binds, inside quarter Q+1', () => {
+  const c = { activationEpoch: 1000, epochsPerQuarter: 2880, postPeriod: 240, verificationWindow: 480 }
   assert.equal(quarterOf(c, 999), 0) // before activation
-  assert.equal(quarterOf(c, 1000), 1) // Start(1) is the activation epoch
-  assert.equal(quarterOf(c, 1000 + 2879), 1) // last epoch of quarter 1
-  assert.equal(quarterOf(c, 1000 + 2880), 2) // Start(2)
+  assert.equal(quarterOf(c, 1000), 1) // activation opens quarter 1 (the SRA's internal index calls it 0)
+  assert.equal(quarterOf(c, 1000 + 2879), 1)
+  assert.equal(quarterOf(c, 1000 + 2880), 2) // Start(2): quarter 1's settlement cycle opens (the SRA's quarterStart(1))
   assert.equal(quarterOf({ activationEpoch: 0, epochsPerQuarter: 2880 }, 5000), 0) // activation epoch not chosen yet
-  // real calibnet block 0x3e3578 (epoch 4076920) carries timestamp 0x6aaba5bc: checks genesisTimestamp in the config
-  assert.equal(epochToTime(cfg, 0x3e3578), new Date(0x6aaba5bc * 1000).toISOString())
+  assert.equal(quarterStart(c, 2), 3880)
+  assert.equal(bindingEpoch(c, 1), 3880 + 240 + 480) // submitShares(1) becomes callable here, inside quarter 2
+  assert.equal(dueCalls(c, { head: 3880 + 720, lastSubmitted: 0, lastChecked: 1, steps: 0 }).quarter, 2)
 })
 
 test('f02 event: write-queued for a gate step', () => {
@@ -197,4 +198,53 @@ test('slack outbox: a failed post is kept in status.slackPending and sent first 
   assert.deepEqual(sent.map((x) => /VolumePosted|SharesSubmitted/.exec(x)[0]), ['VolumePosted', 'SharesSubmitted'])
   assert.deepEqual(status.slackPending, [])
   delete process.env.SLACK_WEBHOOK
+})
+
+test('backup cranker: what is due comes from chain state and the binding epoch alone', () => {
+  const c = { activationEpoch: 1000, epochsPerQuarter: 2880, postPeriod: 240, verificationWindow: 480 }
+  const b1 = bindingEpoch(c, 1) // 4600
+  // before activation, and in quarter 1: nothing to submit yet; the gate starts at lastChecked 1
+  assert.deepEqual(dueCalls(c, { head: 900, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due, [])
+  assert.deepEqual(dueCalls(c, { head: 3000, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due, [])
+  // quarter 2 started (quarter 1's cycle) but quarter 1 not bound yet: still nothing
+  assert.deepEqual(dueCalls(c, { head: b1 - 1, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due.map((d) => d.key), [])
+  // quarter 1 bound: submitShares(1), possible since its binding. The gate waits for quarter 2.
+  const d = dueCalls(c, { head: b1, lastSubmitted: 0, lastChecked: 1, steps: 0 })
+  assert.deepEqual(d.due.map((x) => [x.key, x.since]), [['submitShares(1)', b1]])
+  // two quarters late: only the latest bound quarter is submittable, never an older one
+  const b3 = bindingEpoch(c, 3)
+  assert.deepEqual(dueCalls(c, { head: b3 + 5, lastSubmitted: 0, lastChecked: 1, steps: 0 }).due.map((x) => x.key), ['submitShares(3)', 'quarterlyGateCheck(2)'])
+  // already submitted, gate settled or complete
+  assert.deepEqual(dueCalls(c, { head: b3 + 5, lastSubmitted: 3, lastChecked: 3, steps: 2 }).due, [])
+  assert.deepEqual(dueCalls(c, { head: b3 + 5, lastSubmitted: 3, lastChecked: 1, steps: 8 }).due, [])
+})
+
+test('absence: submitShares warns after absenceAlertHours, turns critical past the backup delay, gate warns after 48 h', async () => {
+  const { absenceFindings } = await import('../lib/absence.js')
+  const c = { activationEpoch: 1000, epochsPerQuarter: 2880 * 91, postPeriod: 8640, verificationWindow: 20160, epochSeconds: 30, crankDelayEpochs: 2880 }
+  const b1 = bindingEpoch(c, 1)
+  const at = (head) => absenceFindings(c, { head, lastSubmitted: 0, lastChecked: 1, steps: 0 })
+  assert.deepEqual(at(b1 + 100), []) // bound 50 minutes ago: not yet
+  assert.deepEqual(at(b1 + 720).map((f) => [f.key, f.severity]), [['submitShares(1)', 'warn']]) // 6 hours
+  assert.deepEqual(at(b1 + 2880 + 720).map((f) => f.severity), ['critical']) // a day + 6 h: the backup should have sent it too
+  assert.match(at(b1 + 720)[0].text, /share map is lost for good/)
+  assert.deepEqual(absenceFindings(c, { head: b1 + 720, lastSubmitted: 1, lastChecked: 1, steps: 0 }), [])
+  const b2 = bindingEpoch(c, 2)
+  const gate = absenceFindings(c, { head: b2 + 5760, lastSubmitted: 2, lastChecked: 1, steps: 0 })
+  assert.deepEqual(gate.map((f) => [f.key, f.severity]), [['quarterlyGateCheck(2)', 'warn']])
+})
+
+test('absence: reminders are throttled, escalations go at once, and recoveries are announced', async () => {
+  const { throttle } = await import('../lib/absence.js')
+  const t0 = Date.parse('2027-01-29T00:00:00Z')
+  const warn = [{ key: 'submitShares(1)', severity: 'warn', title: 't', text: '' }]
+  const first = throttle(warn, {}, t0)
+  assert.equal(first.send.length, 1)
+  assert.equal(throttle(warn, first.sent, t0 + 3600e3).send.length, 0) // an hour later: quiet
+  assert.equal(throttle(warn, first.sent, t0 + 24 * 3600e3).send.length, 1) // a day later: reminder
+  const crit = [{ ...warn[0], severity: 'critical' }]
+  assert.equal(throttle(crit, first.sent, t0 + 60e3).send[0].severity, 'critical') // escalation: at once
+  const done = throttle([], first.sent, t0 + 60e3)
+  assert.deepEqual(done.send.map((f) => f.title), ['resolved: submitShares(1) has landed'])
+  assert.deepEqual(done.sent, {})
 })

@@ -1,5 +1,13 @@
-# Runs the reader every 10 minutes and commits the record, then the backup cranker. The reader only reads from the
-# public endpoints and holds no key; the cranker step holds CRANK_KEY. Rules for when it fails are in DESIGN.md.
+# Every 10 minutes: the reader records what landed and commits it, the absence check says what has not landed, then the
+# backup cranker and the Claim keeper run in a separate job that holds the keys but cannot push.
+#
+#   read    contents: write, no private key. Reads the public endpoints, appends the record, checks for overdue calls,
+#           commits site/data. Each network is its own step and a failure in one never skips the other.
+#   backup  contents: read, no git credential, the keys (environment `production`). Runs after `read` (so the Claim
+#           keeper sees the Claims just recorded) whether or not `read` succeeded. Nothing it does depends on a file it
+#           has to save: the crank delay is measured from the binding epoch, the Claim interval from the record.
+#
+# Either job fails (red) when one of its steps failed, after all its steps have run. Rules for when it fails: DESIGN.md.
 name: read
 on:
   schedule:
@@ -14,7 +22,7 @@ on:
         default: false
 
 permissions:
-  contents: write # to commit the record
+  contents: read
 
 concurrency:
   group: read # never two readers at once: they would write the same epochs twice
@@ -23,14 +31,17 @@ concurrency:
 jobs:
   read:
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # two networks; butterfly took about 5 minutes per 720 epochs on 2026-09-18
+    timeout-minutes: 20
+    permissions:
+      contents: write # to commit the record; this job holds no private key
     steps:
       # ref: main, not the commit that triggered the run: a run that waited in the concurrency queue must start from the
       # previous run's push, or its own push is refused (seen 2026-09-28 00:30 UTC, two runs started at the same moment).
-      - uses: actions/checkout@v4
+      # The git credential stays on the runner because this job pushes.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -39,45 +50,90 @@ jobs:
         run: node bin/slack-test.js
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-      # SLACK_WEBHOOK (a repository secret, optional): the reader posts one Slack message per run that found something
-      # new. Without the secret nothing is sent. Butterflynet opts out in its config.
-      - run: node bin/reader.js config/calibnet.json
+      # Mainnet first. SLACK_WEBHOOK (optional): one message per run that found something new; calibnet opts out.
+      - id: read_mainnet
+        run: node bin/reader.js config/mainnet.json
+        continue-on-error: true
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-      # Mainnet: the contracts are deployed (2026-09-22); the upgrade date is not confirmed. Reads only the endpoint.
-      - run: node bin/reader.js config/mainnet.json
+      - id: watch_mainnet
+        run: node bin/watch.js config/mainnet.json
+        continue-on-error: true
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      - id: read_calibnet
+        run: node bin/reader.js config/calibnet.json
         continue-on-error: true
-      # Butterflynet gamma (the nv29 test network) was read here until 2026-10-15; its endpoint no longer resolves.
-      # Its record stays in site/data/butterfly-gamma and on the page.
-      # Backup cranker (bin/crank.js): sends submitShares / quarterlyGateCheck on calibnet when a call has been
-      # possible for 30 minutes and is still missing. Needs the repository secret CRANK_KEY (a calibnet account
-      # with tFIL, used for nothing else); without it the step is a dry run. Its state file lands in the commit below.
-      - run: node bin/crank.js config/calibnet.json
         env:
-          CRANK_KEY: ${{ secrets.CRANK_KEY }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      - id: watch_calibnet
+        run: node bin/watch.js config/calibnet.json
         continue-on-error: true
-      # Daily Claim keeper (bin/claim.js): once a day, Claim for every wallet f02 owes something to. Needs the
-      # repository secret CLAIM_KEY (an f1 calibnet account with tFIL, used for nothing else); without it, a dry run.
-      - run: node bin/claim.js config/calibnet.json
         env:
-          CLAIM_KEY: ${{ secrets.CLAIM_KEY }}
-        continue-on-error: true
-      # The same two steps on mainnet, with their own keys (real FIL): CRANK_KEY_MAINNET and CLAIM_KEY_MAINNET.
-      # Without the secrets they are dry runs. The mainnet delay is one day (config crankDelayEpochs).
-      - run: node bin/crank.js config/mainnet.json
-        env:
-          CRANK_KEY: ${{ secrets.CRANK_KEY_MAINNET }}
-        continue-on-error: true
-      - run: node bin/claim.js config/mainnet.json
-        env:
-          CLAIM_KEY: ${{ secrets.CLAIM_KEY_MAINNET }}
-        continue-on-error: true
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
       - name: Commit the record if it changed
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "watchtower reader"
           git config user.email "actions@users.noreply.github.com"
           git add site/data/calibnet site/data/mainnet
-          git diff --cached --quiet || git commit -m "record: $(jq -r .lastEpoch site/data/calibnet/status.json)"
+          git diff --cached --quiet || git commit -m "record: $(jq -r .lastEpoch site/data/mainnet/status.json)"
           git push
+      # watch_* fail when a call is overdue: that is the alert, already sent; the red run makes the Actions tab agree.
+      - name: Fail the job if a step failed
+        if: ${{ steps.read_mainnet.outcome == 'failure' || steps.watch_mainnet.outcome == 'failure' || steps.read_calibnet.outcome == 'failure' || steps.watch_calibnet.outcome == 'failure' }}
+        run: |
+          echo "::error::read mainnet ${{ steps.read_mainnet.outcome }}, watch mainnet ${{ steps.watch_mainnet.outcome }}, read calibnet ${{ steps.read_calibnet.outcome }}, watch calibnet ${{ steps.watch_calibnet.outcome }}"
+          exit 1
+
+  backup:
+    needs: read
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Holds the four keys. Store them as secrets of the `production` environment and limit that environment to the main
+    # branch (Settings -> Environments), so a run from any other branch cannot read them. No required reviewers: they
+    # would hold every scheduled run.
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main # the record the read job just pushed
+          persist-credentials: false # this job never pushes; no git credential next to the keys
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev
+      # Backup cranker (bin/crank.js): sends submitShares / quarterlyGateCheck once the quarter has been bound for
+      # crankDelayEpochs and the call is still missing. Without the key, a dry run. Mainnet first.
+      - id: crank_mainnet
+        run: node bin/crank.js config/mainnet.json
+        continue-on-error: true
+        env:
+          CRANK_KEY: ${{ secrets.CRANK_KEY_MAINNET }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      # Claim keeper (bin/claim.js): Claims every owed wallet once nobody has claimed for claimEveryHours.
+      - id: claim_mainnet
+        run: node bin/claim.js config/mainnet.json
+        continue-on-error: true
+        env:
+          CLAIM_KEY: ${{ secrets.CLAIM_KEY_MAINNET }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      - id: crank_calibnet
+        run: node bin/crank.js config/calibnet.json
+        continue-on-error: true
+        env:
+          CRANK_KEY: ${{ secrets.CRANK_KEY }}
+      - id: claim_calibnet
+        run: node bin/claim.js config/calibnet.json
+        continue-on-error: true
+        env:
+          CLAIM_KEY: ${{ secrets.CLAIM_KEY }}
+      - name: Fail the job if a step failed
+        if: ${{ steps.crank_mainnet.outcome == 'failure' || steps.claim_mainnet.outcome == 'failure' || steps.crank_calibnet.outcome == 'failure' || steps.claim_calibnet.outcome == 'failure' }}
+        run: |
+          echo "::error::crank mainnet ${{ steps.crank_mainnet.outcome }}, claim mainnet ${{ steps.claim_mainnet.outcome }}, crank calibnet ${{ steps.crank_calibnet.outcome }}, claim calibnet ${{ steps.claim_calibnet.outcome }}"
+          exit 1

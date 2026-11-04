@@ -87,7 +87,7 @@ import { decodeStreamsState, computeWeight as weightNow, fromBase64 } from './li
 
 // The repo the scheduled job commits the record to. The page asks it first, so the record is fresh even when
 // this page was published long ago; the copy bundled next to the page is the fallback.
-const REPO_RAW = 'https://raw.githubusercontent.com/irenegia/solstice-watchtower/main/site/'
+const REPO_RAW = 'https://raw.githubusercontent.com/fidlabs/solstice-watchtower/main/site/'
 const STALE_MINUTES = 30
 // Views of a network the scheduled job still watches: they get the repo fetch, the "reader stopped" warning and the
 // live read of f02. The other views are fixed records.
@@ -220,7 +220,7 @@ async function main() {
     const quarters = [...new Set(rows.map((r) => r.quarter))].sort((a, b) => b - a)
     $('landed').innerHTML = rows.length === 0 ? '<p>Nothing yet.</p>' : quarters.map((q, i) => {
       const label = q === 0 ? 'Before activation' :
-        `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` + (dataset === 'calibnet' ? ` · rehearsal plan: ${q === 1 ? 'Activation day' : `Q${q - 1} cycle`}` : '')
+        `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` + (q === 1 ? ' · no settlement cycle (quarter 1 settles in quarter 2)' : ` · settlement cycle of quarter ${q - 1}`)
       const body = rows.filter((r) => r.quarter === q).reverse().map(landedRow).join('')
       return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${rows.filter((r) => r.quarter === q).length})</span></summary>
         <div class="scroll"><table><tr><th>time</th><th>source</th><th>what</th><th>result</th><th>link</th></tr>${body}</table></div></details>`
@@ -329,11 +329,11 @@ function glanceQuarter(status, records, nowEpoch, epochTime, quarterStart) {
     segs = seg('seg-post', P, `POST_PERIOD Q${Q - 1}`) + seg('seg-verify', V, `VERIFICATION_WINDOW Q${Q - 1}`) + seg('seg-bound', L - P - V - cutoff, `Q${Q - 1} bound`)
     phaseRow('seg-post', s, s + P, `POST_PERIOD for Q${Q - 1}`)
     phaseRow('seg-verify', s + P, s + P + V, `VERIFICATION_WINDOW for Q${Q - 1}`)
-    phaseRow('seg-bound', s + P + V, e - cutoff, `Q${Q - 1} bound: SubmitShares and gate check`)
+    phaseRow('seg-bound', s + P + V, e - cutoff, `Q${Q - 1} bound: submitShares(${Q - 1}) and gate check`)
   }
   segs += seg('seg-cut', cutoff, 'REGISTRATION_CUTOFF')
   if (cutoff) phaseRow('seg-cut', e - cutoff, e, `REGISTRATION_CUTOFF (${cutoff} epochs): a pair registered here applies from Q${Q + 1}`)
-  const phase = Q === 1 ? 'bootstrap, no posting cycle' : !P || !V ? '' : now < s + P ? `POST_PERIOD for Q${Q - 1} until ${utc(epochTime(s + P))}` : now < s + P + V ? `VERIFICATION_WINDOW for Q${Q - 1} until ${utc(epochTime(s + P + V))}` : `Q${Q - 1} bound at ${utc(epochTime(s + P + V))}: SubmitShares and gate check open`
+  const phase = Q === 1 ? 'bootstrap, no posting cycle' : !P || !V ? '' : now < s + P ? `POST_PERIOD for Q${Q - 1} until ${utc(epochTime(s + P))}` : now < s + P + V ? `VERIFICATION_WINDOW for Q${Q - 1} until ${utc(epochTime(s + P + V))}` : `Q${Q - 1} bound at ${utc(epochTime(s + P + V))}: submitShares(${Q - 1}) and gate check open`
   // FIP-0118 §2.2: a registration applies from its execution epoch (back-cover to the quarter's first epoch); one made in
   // [Start(Q+1) - REGISTRATION_CUTOFF, Start(Q+1)) applies from Start(Q+1) and covers nothing of quarter Q.
   const inCut = cutoff && now >= e - cutoff ? ` · inside REGISTRATION_CUTOFF: a pair registered now applies from ${utc(epochTime(e))} and covers nothing of Q${Q}` : ''
@@ -453,9 +453,10 @@ function footnote(live, status) {
   if (t === undefined || !status.activationEpoch) return
   const d = Math.abs(t - status.activationEpoch)
   const rel = d === 0 ? 'equal' : d === 1 ? 'one epoch apart, which changes nothing here' : `<span class="bad">${d} epochs apart, which is unexpected</span>`
-  $('foot').innerHTML = `Quarter numbers on this page follow the SRA: Start(Q) = activationEpoch + (Q-1) · EPOCHS_PER_QUARTER, with activationEpoch ${status.activationEpoch} ` +
-    `from solstice deployments.json. f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
-    `The two are ${rel}. FIP-0118 §2.4.10 expects them equal.`
+  $('foot').innerHTML = `Quarter numbers on this page follow FIP-0118 §2.2: Start(Q) = activationEpoch + (Q-1) · EPOCHS_PER_QUARTER, with activationEpoch ${status.activationEpoch} ` +
+    `from solstice deployments.json. Quarter Q's activity settles inside quarter Q+1, and the SRA's calls and events for it carry Q (submitShares(Q), SharesSubmitted(Q)); the SRA's internal quarter index (_quarterOf) counts from 0 at activation, one lower than the number here. ` +
+    `f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
+    `activationEpoch and t_start are ${rel}. FIP-0118 §2.4.10 expects them equal.`
 }
 
 // Filfox accepts both 0x transaction hashes and message CIDs. The host is set per network when the record loads.
