@@ -230,6 +230,13 @@ Decisions (Irene, 2026-09-23):
 
 ## The backup cranker (`bin/crank.js`, 2026-10-08)
 
+> **Changed 2026-11 (FIDL fork).** The notes below are the history. Now: the delay is measured from the quarter's
+> binding epoch (no `crank.json`), only the latest bound quarter is tried, fees are capped (`crankMaxFeeFil`), the
+> endpoint's chain id is checked, and a failure alerts and turns the run red. The Claim keeper claims when the record
+> shows no Claim on the stream for `claimEveryHours` (no `claim.json`), in batches of at most 64, with a fee cap and a
+> 10%-of-payout limit. Both run in a separate `backup` job that holds the keys and cannot push. Quarter numbers follow
+> the SRA (quarter q starts at `activationEpoch + q * epochsPerQuarter`), not FIP-0118 §2.2.
+
 Irene's ask: a second, independent cranker, so the two permissionless calls do not depend on one system.
 A step of the read workflow runs it on calibnet after the readers:
 

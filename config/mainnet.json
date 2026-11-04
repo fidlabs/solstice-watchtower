@@ -23,10 +23,15 @@
     "claimer (watchtower backup)": "f1x5uqdow6zqtnrsmesuxd3gdbkze5g5iqkpc2lxq"
   },
   "crankDelayEpochs": 2880,
-  "crankNote": "backup cranker and Claim keeper: a call is sent only after it has been possible for one day (2880 epochs), so the primary cranker goes first; the keys are the secrets CRANK_KEY_MAINNET (an f410 account, label 'cranker (watchtower backup)') and CLAIM_KEY_MAINNET (an f1 account, label 'claimer (watchtower backup)'); without them the steps are dry runs; add both wallets here when the keys exist",
+  "crankNote": "backup cranker and Claim keeper. A crank is sent only once its quarter has been bound for crankDelayEpochs (2880 = one day), so the primary cranker goes first; at most crankMaxFeeFil per message. The Claim keeper claims a stream when nobody has claimed it for claimEveryHours (24 = daily, today's behaviour; raise to 192 once fidlabs/solstice-cranker sends the weekly Claim, to make this a backup), at most claimMaxFeeFil per message and 10% of the payout. absenceAlertHours / gateAlertHours: when bin/watch.js calls submitShares / the gate check overdue. Keys: CRANK_KEY_MAINNET (f410, 'cranker (watchtower backup)') and CLAIM_KEY_MAINNET (f1, 'claimer (watchtower backup)'), secrets of the production environment; without them the steps are dry runs.",
   "dataDir": "site/data/mainnet",
   "startEpoch": 6393225,
   "source": "solstice deployments.json on main at 0006edc (chain 314): activationEpoch 6470280 = Mon 2026-10-19 13:00 UTC, set by solstice PR #97 (b9a63a8, 2026-10-06) after Lotus v1.37.0 fixed UpgradeSolsticeHeight 6470279; the live SRA keeps the old 6450120 until the v1.0.2 upgrade of solstice #96 executes (from 2026-10-14 18:15 UTC), quarter 262974, hold 20160; SWA timelock 20160 (7 days) per FIP-0118. Contracts deployed 2026-09-22: SRA at 6393228 (tx 0x0f9621c1...), SWA at 6393232 (tx 0xf543cbf0...), found with eth_getLogs (Upgraded). startEpoch is three epochs before the SRA deployment.",
   "postPeriod": 8640,
-  "verificationWindow": 20160
+  "verificationWindow": 20160,
+  "crankMaxFeeFil": "0.1",
+  "claimMaxFeeFil": "0.05",
+  "claimEveryHours": 24,
+  "absenceAlertHours": 6,
+  "gateAlertHours": 48
 }

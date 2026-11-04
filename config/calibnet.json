@@ -37,5 +37,10 @@
   "postPeriod": 240,
   "verificationWindow": 480,
   "distributionRpcUrl": "http://lotus.va.gg:2235/rpc/v2",
-  "distributionNote": "rvagg's calibnet Lotus node with Filecoin.StateRewardDistribution (Slack 2026-09-28); optional cross-check, not a public service"
+  "distributionNote": "rvagg's calibnet Lotus node with Filecoin.StateRewardDistribution (Slack 2026-09-28); optional cross-check, not a public service",
+  "crankMaxFeeFil": "0.1",
+  "claimMaxFeeFil": "0.05",
+  "claimEveryHours": 24,
+  "absenceAlertHours": 6,
+  "gateAlertHours": 6
 }
