@@ -11,8 +11,8 @@
   "postPeriod": 240,
   "verificationWindow": 480,
   "swa": "0x66C11A9F6dfEC3c1557958cF9f575a023EB01421",
-  "lastEpoch": 4219355,
-  "lastRun": "2026-11-05T22:28:53.824Z",
+  "lastEpoch": 4220075,
+  "lastRun": "2026-11-06T02:45:28.863Z",
   "reads": {
     "f02 state": "{\"SWAActor\":\"t0200118\",\"SWATimelockEpochs\":720,\"StreamsRoot\":{\"/\":\"bafy2bzacecoyqh4v6jjrv2ovtduuvwz6nevxumynkrupmxjfvbyuwioh4ll56\"}}",
     "balance of f099 (burn)": "{\"address\":\"0xff00000000000000000000000000000000000063\",\"attoFil\":\"48716952490984598903145205\"}",
