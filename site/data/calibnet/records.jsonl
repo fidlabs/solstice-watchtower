@@ -2200,3 +2200,4 @@
 {"kind":"read","epoch":4231032,"time":"2026-11-09T20:49:00.000Z","quarter":43,"source":"SRA","name":"SRA fpvOf(42, 0xfF0000000000000000000000000000000000005a)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4231032,"time":"2026-11-09T20:49:00.000Z","quarter":43,"source":"SRA","name":"SRA fpvOf(42, 0x72ad7C4d27fC9C2bDF8fde34ddd9BcbE34648AF3)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4231032,"time":"2026-11-09T20:49:00.000Z","quarter":43,"source":"SRA","name":"SRA fpvOf(42, 0x22B1a2668fbFcb38AaD33E2d1e0b157216a22421)","fields":{"fpv":{"usd":"0"}}}
+{"kind":"read","epoch":4231775,"time":"2026-11-10T03:00:30.000Z","quarter":43,"source":"balance","name":"balance of cranker (watchtower backup)","fields":{"address":"0x049Ba5f9551c4372E1F9dCde82146E39D6689c7E","attoFil":"104999914822056167877"}}
