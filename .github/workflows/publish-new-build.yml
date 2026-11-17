@@ -10,10 +10,6 @@ on:
         description: "Image version, e.g. 1.2.3"
         required: true
         type: string
-      commit_sha:
-        description: "Optional source commit or tag; defaults to the selected workflow commit"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -27,7 +23,6 @@ jobs:
     uses: ./.github/workflows/build-docker-image.yml
     with:
       version: ${{ github.event.release.tag_name || inputs.version }}
-      commit_sha: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || inputs.commit_sha || github.sha }}
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
