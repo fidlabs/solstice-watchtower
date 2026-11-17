@@ -2,16 +2,14 @@
 // Solidity sources. None of it is chain data. Run with: npm test
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import * as dagCbor from '@ipld/dag-cbor'
 import { encodeFunctionData, encodeErrorResult } from 'viem'
-import { quarterOf, quarterStart, bindingEpoch, dueCalls, epochToTime } from '../lib/chain.js'
+import { quarterOf, quarterStart, bindingEpoch, dueCalls } from '../lib/chain.js'
 import { decodeActorEvent, decodeStreamsState, decodeF02Params, computeWeight, bigFromBytes, idToEthAddress, writeOutcome } from '../site/lib/f02.js'
 import { abi, decodeLog, decodeCall, decodeRevert } from '../lib/evm.js'
 import { PCT, entry, idAddress, tokenBytes, flat, sampleLog } from './samples.js'
 import { slackText, notify } from '../lib/notify.js'
 
-const cfg = JSON.parse(readFileSync(new URL('../config/calibnet.json', import.meta.url), 'utf8'))
 const stepTo15 = dagCbor.encode([[[2, flat(15n, 4100000)]]]) // payload of a StepWeightRecords write: stream 2 to 15%
 
 test('quarter numbers are FIP-0118 §2.2\'s; quarter Q settles, and binds, inside quarter Q+1', () => {
