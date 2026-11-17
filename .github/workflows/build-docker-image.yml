@@ -54,7 +54,7 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - run: npm ci
       - run: npm run lint:check
       - run: npm test

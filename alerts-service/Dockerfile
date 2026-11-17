@@ -1,5 +1,5 @@
 # Node built-ins only: nothing to install, nothing to audit beyond the base image.
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 COPY package.json ./
 COPY src ./src
