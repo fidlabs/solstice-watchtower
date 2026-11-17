@@ -55,7 +55,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - run: npm ci
       - run: npm run lint:check
       - run: npm test
@@ -102,5 +101,3 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: public.ecr.aws/f4h6r4m9/${{ matrix.repository }}:${{ needs.validate.outputs.version }}
-          cache-from: type=gha,scope=${{ matrix.repository }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.repository }}
