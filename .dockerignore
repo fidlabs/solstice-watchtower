@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+**/node_modules
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+coverage
+**/__pycache__
+tests
+alerts-service

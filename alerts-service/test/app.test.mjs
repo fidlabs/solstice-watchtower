@@ -112,6 +112,14 @@ describe('sign-up: double opt-in', () => {
     assert.equal((await form('/api/subscribe', { email: 'u9@example.org' }, { 'x-test-ip': '10.0.0.2' })).status, 200);
   });
 
+  it('rate-limits by the proxy-appended X-Forwarded-For entry, ignoring client-supplied ones', async () => {
+    app = createApp({ config: loadConfig({ ...ENV, CLIENT_IP_HEADER: 'x-forwarded-for' }), resend, now: () => clock.t, log: () => {} });
+    const xff = (spoofed, real) => ({ 'x-forwarded-for': `${spoofed}, ${real}` });
+    for (let i = 0; i < 5; i++) assert.equal((await form('/api/subscribe', { email: `f${i}@example.org` }, xff(`1.1.1.${i}`, '203.0.113.7'))).status, 200);
+    assert.equal((await form('/api/subscribe', { email: 'f9@example.org' }, xff('1.1.1.99', '203.0.113.7'))).status, 429);
+    assert.equal((await form('/api/subscribe', { email: 'f9@example.org' }, xff('1.1.1.99', '203.0.113.8'))).status, 200);
+  });
+
   it('allows the configured origin to post the form, and no other', async () => {
     const ok = await form('/api/subscribe', { email: 'x@example.org' }, { origin: 'https://watch.example.test', accept: 'application/json' });
     assert.equal(ok.headers.get('access-control-allow-origin'), 'https://watch.example.test');
