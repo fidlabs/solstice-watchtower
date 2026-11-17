@@ -1,15 +1,27 @@
 {
   "name": "solstice-watchtower-poc",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "read": "node bin/reader.js config/calibnet.json",
     "test": "node --test tests/*.test.js",
-    "page": "python3 -m http.server 8000 --directory site"
+    "page": "python3 -m http.server 8000 --directory site",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint . --max-warnings=0",
+    "test:alerts": "npm test --prefix alerts-service"
   },
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.0",
     "iso-filecoin": "^7.4.7",
     "viem": "^2.48.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0"
   }
 }

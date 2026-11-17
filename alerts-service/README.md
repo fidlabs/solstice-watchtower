@@ -30,7 +30,7 @@ in-memory throttling. Subscribers are stored as Resend contacts in one segment.
 | `INGEST_TOKEN` | `openssl rand -hex 32` | The bearer token the jobs use. Also store it as the repo secret `ALERT_SERVICE_TOKEN`. |
 | `ALLOWED_ORIGINS` | `https://watchtower.fidl.tech` | Pages allowed to post the sign-up form from the browser. |
 | `MIN_SEVERITY` | `warn` | `info`, `warn` or `critical`. |
-| `CLIENT_IP_HEADER` | `do-connecting-ip` | The header carrying the client address behind the load balancer. The default is App Platform's; on a droplet behind your own proxy, use `x-forwarded-for`. |
+| `CLIENT_IP_HEADER` | `do-connecting-ip` | The header carrying the client address behind the load balancer. The default is App Platform's; on a droplet behind your own proxy, use `x-forwarded-for`; its last entry (the one your proxy appends) is used, so exactly one trusted proxy must sit in front. |
 
 ## Deploy on DigitalOcean App Platform
 

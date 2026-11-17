@@ -46,8 +46,12 @@ export function createApp({ config, resend, now = () => Date.now(), log = (...a)
 
   const clientIp = (req) => {
     const h = req.headers[config.clientIpHeader];
-    const v = Array.isArray(h) ? h[0] : h;
-    return (v ? v.split(',')[0].trim() : req.socket?.remoteAddress) || 'unknown';
+    const v = Array.isArray(h) ? h.join(',') : h;
+    if (!v) return req.socket?.remoteAddress || 'unknown';
+    // Proxies append to X-Forwarded-For, so only the last entry (added by our load balancer) can be trusted;
+    // earlier entries come from the client. Single-value headers like do-connecting-ip are used as-is.
+    const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
+    return (config.clientIpHeader === 'x-forwarded-for' ? parts.at(-1) : parts[0]) || 'unknown';
   };
 
   function send(res, status, body, type = 'text/html; charset=utf-8', extra = {}) {

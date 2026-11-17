@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths-ignore: ['site/data/**'] # the reader's record commits
+    paths-ignore: ["site/data/**"] # the reader's record commits
 permissions:
   contents: read
 jobs:
@@ -17,9 +17,38 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: for f in bin/*.js lib/*.js site/lib/*.js; do node --check "$f"; done
+      - run: npm run lint:check
       - run: npm test
-      - run: npm test --prefix alerts-service
+      - run: npm run test:alerts
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build and smoke-test EC2 images
+        run: |
+          docker build -t watchtower-site:test .
+          docker build -t watchtower-alerts:test alerts-service
+          docker run -d --name site -p 8000:8000 -e ALERTS_URL=https://alerts.example.test watchtower-site:test
+          docker run -d --name alerts -p 8080:8080 \
+            -e PUBLIC_URL=https://alerts.example.test \
+            -e RESEND_API_KEY=ci-not-a-real-key -e RESEND_SEGMENT_ID=ci-segment \
+            -e MAIL_FROM=alerts@example.test \
+            -e TOKEN_SECRET=ci-only-token-secret-at-least-32-characters \
+            -e INGEST_TOKEN=ci-only-ingest-token-at-least-32-characters \
+            watchtower-alerts:test
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 http://localhost:8000/index.html -o /tmp/watchtower-index.html
+          grep -F 'const ALERTS_URL = "https://alerts.example.test"' /tmp/watchtower-index.html
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 http://localhost:8080/healthz
+      - name: Container logs
+        if: failure()
+        run: |
+          docker logs site || true
+          docker logs alerts || true
