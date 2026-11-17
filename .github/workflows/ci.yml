@@ -44,9 +44,9 @@ jobs:
             -e TOKEN_SECRET=ci-only-token-secret-at-least-32-characters \
             -e INGEST_TOKEN=ci-only-ingest-token-at-least-32-characters \
             watchtower-alerts:test
-          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://localhost:8000/index.html -o /tmp/watchtower-index.html
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 http://localhost:8000/index.html -o /tmp/watchtower-index.html
           grep -F 'const ALERTS_URL = "https://alerts.example.test"' /tmp/watchtower-index.html
-          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://localhost:8080/healthz
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 http://localhost:8080/healthz
       - name: Container logs
         if: failure()
         run: |
