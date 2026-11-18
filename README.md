@@ -41,14 +41,14 @@ hours is an email. Set `ALERTS_URL` in `site/index.html` to show the sign-up for
 
 Needs Node.js 22 or newer.
 
-| Command | What it does |
-|---|---|
-| `npm ci` | Installs the three libraries (`viem`, `iso-filecoin`, `@ipld/dag-cbor`). Once. |
-| `npm run read` | One run of the reader against calibnet. Only reads from the public RPC endpoint. Appends to `site/data/calibnet/records.jsonl`. |
-| `node bin/watch.js config/mainnet.json` | The absence check, once. Writes `site/data/mainnet/alerts.json`. |
-| `node bin/crank.js config/mainnet.json` / `node bin/claim.js config/mainnet.json` | The backup cranker / Claim keeper, once. Without a key, a dry run that sends nothing. |
-| `node bin/newkey.js mainnet <file>` | A new f1 key for the Claim keeper, written to a 0600 file; prints only the address. |
-| `npm run page` | Serves the page at http://localhost:8000. Stop with Ctrl+C. |
-| `npm test` | Decoder and decision tests on hand-written inputs. No chain data. |
+| Command                                                                           | What it does                                                                                                                    |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `npm ci`                                                                          | Installs the three libraries (`viem`, `iso-filecoin`, `@ipld/dag-cbor`). Once.                                                  |
+| `npm run read`                                                                    | One run of the reader against calibnet. Only reads from the public RPC endpoint. Appends to `site/data/calibnet/records.jsonl`. |
+| `node bin/watch.js config/mainnet.json`                                           | The absence check, once. Writes `site/data/mainnet/alerts.json`.                                                                |
+| `node bin/crank.js config/mainnet.json` / `node bin/claim.js config/mainnet.json` | The backup cranker / Claim keeper, once. Without a key, a dry run that sends nothing.                                           |
+| `node bin/newkey.js mainnet <file>`                                               | A new f1 key for the Claim keeper, written to a 0600 file; prints only the address.                                             |
+| `npm run page`                                                                    | Serves the page at http://localhost:8000. Stop with Ctrl+C.                                                                     |
+| `npm test`                                                                        | Decoder and decision tests on hand-written inputs. No chain data.                                                               |
 
 Contract addresses, geometry and the activation epoch in `config/*.json` come from solstice `deployments.json`.

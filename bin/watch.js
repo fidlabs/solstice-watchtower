@@ -11,9 +11,11 @@ import { alert, heartbeat } from '../lib/notify.js'
 const cfg = JSON.parse(readFileSync(process.argv[2] ?? 'config/calibnet.json', 'utf8'))
 const rpc = makeRpc(cfg.rpcUrl)
 const chainId = Number(await rpc('eth_chainId'))
-if (chainId !== cfg.chainId) throw new Error(`the endpoint reports chain ${chainId}, but ${cfg.network} is chain ${cfg.chainId}`)
+if (chainId !== cfg.chainId)
+  throw new Error(`the endpoint reports chain ${chainId}, but ${cfg.network} is chain ${cfg.chainId}`)
 const head = Number(await rpc('eth_blockNumber'))
-const word = async (address, slot) => BigInt(await rpc('eth_getStorageAt', [address, '0x' + slot.toString(16).padStart(64, '0'), 'latest']))
+const word = async (address, slot) =>
+  BigInt(await rpc('eth_getStorageAt', [address, '0x' + slot.toString(16).padStart(64, '0'), 'latest']))
 const low64 = (w) => Number(w & 0xffffffffffffffffn)
 const GATE = 0xf9abab00248d945495524c8caf6be2b837274c1becd1964fb3775f62fd6e4600n
 const state = {
@@ -23,7 +25,9 @@ const state = {
   steps: low64(await word(cfg.swa, GATE + 3n)),
 }
 const findings = absenceFindings(cfg, state)
-console.log(`${cfg.network} epoch ${head} · lastSubmittedQuarter ${state.lastSubmitted} · gate ${state.lastChecked}/${state.steps} · ${findings.length ? findings.map((f) => `${f.severity}: ${f.title}`).join('; ') : 'nothing overdue'}`)
+console.log(
+  `${cfg.network} epoch ${head} · lastSubmittedQuarter ${state.lastSubmitted} · gate ${state.lastChecked}/${state.steps} · ${findings.length ? findings.map((f) => `${f.severity}: ${f.title}`).join('; ') : 'nothing overdue'}`,
+)
 
 const path = join(cfg.dataDir, 'alerts.json')
 const before = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}

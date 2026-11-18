@@ -6,7 +6,15 @@ import { join } from 'node:path'
 import * as dagCbor from '@ipld/dag-cbor'
 import { encodeFunctionData, decodeFunctionResult } from 'viem'
 import { makeRpc, toHex, epochToTime, quarterOf } from '../lib/chain.js'
-import { decodeActorEvent, decodeStreamsState, decodeF02Params, idToEthAddress, slotOf, writeOutcome, computeWeight } from '../site/lib/f02.js'
+import {
+  decodeActorEvent,
+  decodeStreamsState,
+  decodeF02Params,
+  idToEthAddress,
+  slotOf,
+  writeOutcome,
+  computeWeight,
+} from '../site/lib/f02.js'
 import { abi, decodeLog, decodeCall, decodeRevert, plain } from '../lib/evm.js'
 import { notify, emailRecords } from '../lib/notify.js'
 
@@ -24,8 +32,21 @@ const ZERO = '0x0000000000000000000000000000000000000000'
 // FIP-0118 counters (TotalMintedReward, TotalBurnMinted, TotalExplicitMinted, Accrued) move with every block reward too;
 // they are readable live. The f099 (burn) balance was a per-run read until 2026-09-25; it moves every epoch, so it wrote
 // one line per run on every network and was dropped from the record (the page can read it live).
-const NOISY = ['Epoch', 'ThisEpochReward', 'TotalStoragePowerReward', 'ThisEpochRewardSmoothed', 'CumsumBaseline', 'CumsumRealized', 'EffectiveBaselinePower', 'ThisEpochBaselinePower', 'EffectiveNetworkTime',
-  'TotalMintedReward', 'TotalBurnMinted', 'TotalExplicitMinted', 'Accrued']
+const NOISY = [
+  'Epoch',
+  'ThisEpochReward',
+  'TotalStoragePowerReward',
+  'ThisEpochRewardSmoothed',
+  'CumsumBaseline',
+  'CumsumRealized',
+  'EffectiveBaselinePower',
+  'ThisEpochBaselinePower',
+  'EffectiveNetworkTime',
+  'TotalMintedReward',
+  'TotalBurnMinted',
+  'TotalExplicitMinted',
+  'Accrued',
+]
 
 const cfg = JSON.parse(readFileSync(process.argv[2] ?? 'config/calibnet.json', 'utf8'))
 const rpc = makeRpc(cfg.rpcUrl)
@@ -37,7 +58,14 @@ const status = existsSync(statusPath) ? JSON.parse(readFileSync(statusPath, 'utf
 status.pending ??= {}
 
 // address -> name, lower case. A contract still at the zero address is not deployed yet and is skipped.
-const contracts = new Map([['SRA', cfg.sra], ['SWA', cfg.swa]].filter(([, a]) => a !== ZERO).map(([n, a]) => [a.toLowerCase(), n]))
+const contracts = new Map(
+  [
+    ['SRA', cfg.sra],
+    ['SWA', cfg.swa],
+  ]
+    .filter(([, a]) => a !== ZERO)
+    .map(([n, a]) => [a.toLowerCase(), n]),
+)
 // address -> label, for the "via" of a message sent through a known multisig
 const names = new Map(Object.entries({ ...cfg.owners, ...cfg.wallets }).map(([n, a]) => [a.toLowerCase(), n]))
 
@@ -51,7 +79,16 @@ if (to < from) {
 
 const records = []
 const rec = (kind, epoch, source, name, fields, extra = {}) =>
-  records.push({ kind, epoch, time: epochToTime(cfg, epoch), quarter: quarterOf(cfg, epoch), source, name, fields, ...extra })
+  records.push({
+    kind,
+    epoch,
+    time: epochToTime(cfg, epoch),
+    quarter: quarterOf(cfg, epoch),
+    source,
+    name,
+    fields,
+    ...extra,
+  })
 
 // 1. f02 actor events. A node can have this API switched off; that is recorded, and the run goes on.
 // A node's event index can be a few seconds behind its chain head ("events for the requested block are not yet
@@ -60,11 +97,23 @@ let f02Events = []
 for (let attempt = 1; ; attempt++) {
   try {
     f02Events = []
-    for (let a = from; a <= to; a += LOG_CHUNK) f02Events.push(...((await rpc('Filecoin.GetActorEventsRaw', [{ addresses: [cfg.f02], fromHeight: a, toHeight: Math.min(to, a + LOG_CHUNK - 1) }])) ?? [])) // same 360-block cap as eth_getLogs
+    for (let a = from; a <= to; a += LOG_CHUNK)
+      f02Events.push(
+        ...((await rpc('Filecoin.GetActorEventsRaw', [
+          { addresses: [cfg.f02], fromHeight: a, toHeight: Math.min(to, a + LOG_CHUNK - 1) },
+        ])) ?? []),
+      ) // same 360-block cap as eth_getLogs
     break
   } catch (err) {
-    if (attempt < 3) { await new Promise((r) => setTimeout(r, 10_000)); continue }
-    rec('gap', from, 'reader', 'f02 events could not be read', { fromEpoch: from, toEpoch: to, reason: err.message.slice(0, 160) })
+    if (attempt < 3) {
+      await new Promise((r) => setTimeout(r, 10_000))
+      continue
+    }
+    rec('gap', from, 'reader', 'f02 events could not be read', {
+      fromEpoch: from,
+      toEpoch: to,
+      reason: err.message.slice(0, 160),
+    })
     break
   }
 }
@@ -86,9 +135,18 @@ for (const ev of f02Events) {
 // A Claim is checked twice: the event gives recipient and amount, the wallet balance must move by the same amount.
 async function claimCheck(epoch, { recipient, amountAttoFil }) {
   const wallet = idToEthAddress(recipient.slice(2))
-  const [before, after] = await Promise.all([epoch - 1, epoch + 1].map((e) => rpc('eth_getBalance', [wallet, toHex(e)])))
+  const [before, after] = await Promise.all(
+    [epoch - 1, epoch + 1].map((e) => rpc('eth_getBalance', [wallet, toHex(e)])),
+  )
   const difference = (BigInt(after) - BigInt(before)).toString()
-  rec('read', epoch + 1, 'f02', 'claim check', { recipient, amountAttoFil, balanceBefore: BigInt(before).toString(), balanceAfter: BigInt(after).toString(), difference, matches: difference === amountAttoFil })
+  rec('read', epoch + 1, 'f02', 'claim check', {
+    recipient,
+    amountAttoFil,
+    balanceBefore: BigInt(before).toString(),
+    balanceAfter: BigInt(after).toString(),
+    difference,
+    matches: difference === amountAttoFil,
+  })
 }
 
 const unreadable = [] // epochs whose block the node could not serve; recorded as a gap, never hidden
@@ -102,7 +160,12 @@ if (contracts.size) {
   for (let attempt = 1; ; attempt++) {
     try {
       logs.length = 0
-      for (let a = from; a <= to; a += LOG_CHUNK) logs.push(...await rpc('eth_getLogs', [{ address: [...contracts.keys()], fromBlock: toHex(a), toBlock: toHex(Math.min(to, a + LOG_CHUNK - 1)) }]))
+      for (let a = from; a <= to; a += LOG_CHUNK)
+        logs.push(
+          ...(await rpc('eth_getLogs', [
+            { address: [...contracts.keys()], fromBlock: toHex(a), toBlock: toHex(Math.min(to, a + LOG_CHUNK - 1)) },
+          ])),
+        )
       break
     } catch (err) {
       if (attempt === 3) throw err
@@ -111,7 +174,10 @@ if (contracts.size) {
   }
   for (const log of logs) {
     const { name, fields } = decodeLog(log)
-    rec('event', Number(log.blockNumber), contracts.get(log.address.toLowerCase()), name, fields, { tx: log.transactionHash, raw: { topics: log.topics, data: log.data } })
+    rec('event', Number(log.blockNumber), contracts.get(log.address.toLowerCase()), name, fields, {
+      tx: log.transactionHash,
+      raw: { topics: log.topics, data: log.data },
+    })
   }
 
   // 3. messages to the SRA or the SWA, direct or through any Safe, with their result. Until 2026-09-30 only the four
@@ -137,11 +203,27 @@ if (contracts.size) {
       // Out of gas (all gas used): the chain keeps no reason. A replay with enough gas shows whether the call would
       // have failed anyway (all five seen on 2026-09-29 would have).
       const outOfGas = !ok && BigInt(receipt.gasUsed) === BigInt(tx.gas)
-      const replay = () => call.innerTo ? replayReason(sentTo, target, call.innerData, call.innerValue, epoch) : replayReason(tx.from, target, tx.input, tx.value, epoch)
+      const replay = () =>
+        call.innerTo
+          ? replayReason(sentTo, target, call.innerData, call.innerValue, epoch)
+          : replayReason(tx.from, target, tx.input, tx.value, epoch)
       // A direct call: the chain keeps its revert reason in the receipt. A call sent through a multisig: the
       // receipt holds the multisig's own result, so the reason of the call inside it needs a replay.
-      const error = ok ? undefined : outOfGas ? `out of gas (gas limit ${BigInt(tx.gas)}); ${await replay()}` : call.innerTo ? await replay() : await receiptReason(tx.hash)
-      rec('message', epoch, contracts.get(target), call.name, call.fields, { from: tx.from, via: call.innerTo ? names.get(sentTo) ?? sentTo : undefined, ok, error, tx: tx.hash, raw: { input: tx.input } })
+      const error = ok
+        ? undefined
+        : outOfGas
+          ? `out of gas (gas limit ${BigInt(tx.gas)}); ${await replay()}`
+          : call.innerTo
+            ? await replay()
+            : await receiptReason(tx.hash)
+      rec('message', epoch, contracts.get(target), call.name, call.fields, {
+        from: tx.from,
+        via: call.innerTo ? (names.get(sentTo) ?? sentTo) : undefined,
+        ok,
+        error,
+        tx: tx.hash,
+        raw: { input: tx.input },
+      })
     }
   }
 }
@@ -150,7 +232,17 @@ if (contracts.size) {
 // messages, so they are not in the Eth blocks above. Only from the activation epoch on: before it, f02 has no
 // such methods. ponytail: two more requests per epoch; drop when an index serves messages by address.
 // Method numbers: solstice src/lib/FVMRewardMethod.sol (FRC-0042 hashes of the method names).
-const F02_METHODS = { 386660827: 'RegisterStream', 1623858416: 'RemoveStream', 3362570548: 'SetWeightRecords', 3951753085: 'StepWeightRecords', 3872725033: 'SetDistribution', 187585191: 'CancelPending', 2414422607: 'SetShares', 4045527845: 'Claim', 3068846150: 'ReplaceAddress' }
+const F02_METHODS = {
+  386660827: 'RegisterStream',
+  1623858416: 'RemoveStream',
+  3362570548: 'SetWeightRecords',
+  3951753085: 'StepWeightRecords',
+  3872725033: 'SetDistribution',
+  187585191: 'CancelPending',
+  2414422607: 'SetShares',
+  4045527845: 'Claim',
+  3068846150: 'ReplaceAddress',
+}
 const f02Id = cfg.f02.slice(1) // "t02" and "f02" name the same actor
 for (let epoch = Math.max(from, cfg.activationEpoch || Infinity); epoch <= to; epoch++) {
   let messages
@@ -174,11 +266,22 @@ for (let epoch = Math.max(from, cfg.activationEpoch || Infinity); epoch <= to; e
     } catch {
       fields = { params: m.Params } // kept as sent
     }
-    rec('message', epoch, 'f02', name, fields, { from: m.From, ok: receipt?.ExitCode === 0, error: receipt?.ExitCode ? `exit code ${receipt.ExitCode}` : undefined, msgCid: Cid['/'] })
+    rec('message', epoch, 'f02', name, fields, {
+      from: m.From,
+      ok: receipt?.ExitCode === 0,
+      error: receipt?.ExitCode ? `exit code ${receipt.ExitCode}` : undefined,
+      msgCid: Cid['/'],
+    })
   }
 }
 function plainCbor(v) {
-  return v instanceof Uint8Array ? '0x' + Buffer.from(v).toString('hex') : typeof v === 'bigint' ? v.toString() : Array.isArray(v) ? v.map(plainCbor) : v
+  return v instanceof Uint8Array
+    ? '0x' + Buffer.from(v).toString('hex')
+    : typeof v === 'bigint'
+      ? v.toString()
+      : Array.isArray(v)
+        ? v.map(plainCbor)
+        : v
 }
 
 // Cross-check with rvagg's Lotus node, which serves Filecoin.StateRewardDistribution (the f02 split of one tipset's
@@ -199,27 +302,47 @@ async function distributionCheck(state) {
   const diffs = []
   for (const st of block.Streams) {
     const ours = state.streams.find((x) => x.id === Number(st.ID))
-    if (!ours) { diffs.push(`stream ${st.ID}: in the node, not in the f02 state read`); continue }
+    if (!ours) {
+      diffs.push(`stream ${st.ID}: in the node, not in the f02 state read`)
+      continue
+    }
     const w = computeWeight(ours.weight, d.Height).toString()
     if (w !== st.Weight) diffs.push(`stream ${st.ID} weight: watchtower ${w}, node ${st.Weight}`)
-    const nodeShares = (st.Distribution?.Recipients ?? []).map((r) => `${r.Recipient}:${r.Share}`).sort().join(',')
-    const ourShares = (ours.distribution?.shares ?? []).map((r) => `${r.recipient}:${r.share}`).sort().join(',')
-    if (nodeShares !== ourShares) diffs.push(`stream ${st.ID} share map: watchtower [${ourShares}], node [${nodeShares}]`)
+    const nodeShares = (st.Distribution?.Recipients ?? [])
+      .map((r) => `${r.Recipient}:${r.Share}`)
+      .sort()
+      .join(',')
+    const ourShares = (ours.distribution?.shares ?? [])
+      .map((r) => `${r.recipient}:${r.share}`)
+      .sort()
+      .join(',')
+    if (nodeShares !== ourShares)
+      diffs.push(`stream ${st.ID} share map: watchtower [${ourShares}], node [${nodeShares}]`)
   }
-  for (const ours of state.streams) if (!block.Streams.some((st) => Number(st.ID) === ours.id)) diffs.push(`stream ${ours.id}: in the f02 state read, not in the node`)
-  if (diffs.length) rec('read', d.Height, 'f02', 'distribution check', { height: d.Height, matches: false, differences: diffs })
+  for (const ours of state.streams)
+    if (!block.Streams.some((st) => Number(st.ID) === ours.id))
+      diffs.push(`stream ${ours.id}: in the f02 state read, not in the node`)
+  if (diffs.length)
+    rec('read', d.Height, 'f02', 'distribution check', { height: d.Height, matches: false, differences: diffs })
   const t = d.Totals
   if (t && BigInt(t.MintedReward) > 0n) {
-    const burnBps = (BigInt(t.BurnAllocation) * 10000n / BigInt(t.MintedReward)).toString()
-    await read('f02', 'burn share of the block reward (node)', async () => ({ basisPoints: burnBps, note: 'BurnAllocation / MintedReward, from Filecoin.StateRewardDistribution' }))
+    const burnBps = ((BigInt(t.BurnAllocation) * 10000n) / BigInt(t.MintedReward)).toString()
+    await read('f02', 'burn share of the block reward (node)', async () => ({
+      basisPoints: burnBps,
+      note: 'BurnAllocation / MintedReward, from Filecoin.StateRewardDistribution',
+    }))
   }
 }
 
 // Rule: a gap that cannot be read is recorded, not hidden. Consecutive epochs become one record.
-for (let i = 0; i < unreadable.length; ) {
+for (let i = 0; i < unreadable.length;) {
   let j = i
   while (j + 1 < unreadable.length && unreadable[j + 1].epoch === unreadable[j].epoch + 1) j++
-  rec('gap', unreadable[i].epoch, 'reader', 'could not be read', { fromEpoch: unreadable[i].epoch, toEpoch: unreadable[j].epoch, reason: unreadable[i].reason })
+  rec('gap', unreadable[i].epoch, 'reader', 'could not be read', {
+    fromEpoch: unreadable[i].epoch,
+    toEpoch: unreadable[j].epoch,
+    reason: unreadable[i].reason,
+  })
   i = j + 1
 }
 
@@ -242,8 +365,17 @@ async function replayReason(sender, target, data, value, epoch) {
   }
 }
 
-function pendingKey(w) { return `${slotOf(w)}|${w.effectiveEpoch}` }
-function watchWrite(w) { status.pending[pendingKey(w)] ??= { op: w.op, streamId: w.streamId, effectiveEpoch: w.effectiveEpoch, payload: w.payload } }
+function pendingKey(w) {
+  return `${slotOf(w)}|${w.effectiveEpoch}`
+}
+function watchWrite(w) {
+  status.pending[pendingKey(w)] ??= {
+    op: w.op,
+    streamId: w.streamId,
+    effectiveEpoch: w.effectiveEpoch,
+    payload: w.payload,
+  }
+}
 
 // The f02 stream state as it was at a past epoch.
 async function streamsAt(epoch) {
@@ -251,7 +383,10 @@ async function streamsAt(epoch) {
   const { State } = await rpc('Filecoin.StateReadState', [cfg.f02, tipset.Cids])
   const root = Object.values(State).find((v) => v && typeof v === 'object' && '/' in v)?.['/']
   if (!root) throw new Error('f02 has no stream state at that epoch')
-  return decodeStreamsState(Buffer.from(await rpc('Filecoin.ChainReadObj', [{ '/': root }]), 'base64'), cfg.addressPrefix)
+  return decodeStreamsState(
+    Buffer.from(await rpc('Filecoin.ChainReadObj', [{ '/': root }]), 'base64'),
+    cfg.addressPrefix,
+  )
 }
 
 // 4. reads: values that leave no event. A read is recorded only when its value changed since the last run.
@@ -271,7 +406,11 @@ async function read(source, name, fn) {
 async function view(address, functionName, args = []) {
   const data = encodeFunctionData({ abi, functionName, args })
   try {
-    const out = decodeFunctionResult({ abi, functionName, data: await rpc('eth_call', [{ to: address, data }, 'latest']) })
+    const out = decodeFunctionResult({
+      abi,
+      functionName,
+      data: await rpc('eth_call', [{ to: address, data }, 'latest']),
+    })
     const outputName = abi.find((x) => x.type === 'function' && x.name === functionName).outputs[0].name || 'result'
     return { [outputName]: plain(out) }
   } catch (err) {
@@ -287,7 +426,10 @@ await read('f02', 'f02 state', async () => {
 })
 if (streamsRoot) {
   await read('f02', 'f02 streams', async () => {
-    const state = decodeStreamsState(Buffer.from(await rpc('Filecoin.ChainReadObj', [{ '/': streamsRoot }]), 'base64'), cfg.addressPrefix)
+    const state = decodeStreamsState(
+      Buffer.from(await rpc('Filecoin.ChainReadObj', [{ '/': streamsRoot }]), 'base64'),
+      cfg.addressPrefix,
+    )
     state.pendingWrites.forEach(watchWrite) // the queue in the state is the second source of queued writes, next to the events
     headStreams = state
     return state
@@ -312,12 +454,26 @@ for (const [key, write] of Object.entries(status.pending)) {
     outcome = `could not be read: ${err.message.slice(0, 120)}` // usually: the node no longer keeps that state
   }
   if (outcome === 'still queued' && chainHead - E < 20) continue // give it a few more epochs before saying so
-  rec('read', readAt, 'f02', 'queued write outcome', { op: write.op, streamId: write.streamId ?? null, effectiveEpoch: E, outcome, readAtEpoch: readAt, payload: write.payload })
+  rec('read', readAt, 'f02', 'queued write outcome', {
+    op: write.op,
+    streamId: write.streamId ?? null,
+    effectiveEpoch: E,
+    outcome,
+    readAtEpoch: readAt,
+    payload: write.payload,
+  })
   delete status.pending[key]
 }
 for (const [label, address] of Object.entries(cfg.wallets)) {
   // an f1 wallet (the claimer) has no 0x form that eth_getBalance accepts; the native call takes both
-  await read('balance', `balance of ${label}`, async () => ({ address, attoFil: BigInt(address.startsWith('0x') ? await rpc('eth_getBalance', [address, 'latest']) : await rpc('Filecoin.WalletBalance', [address])).toString() }))
+  await read('balance', `balance of ${label}`, async () => ({
+    address,
+    attoFil: BigInt(
+      address.startsWith('0x')
+        ? await rpc('eth_getBalance', [address, 'latest'])
+        : await rpc('Filecoin.WalletBalance', [address]),
+    ).toString(),
+  }))
 }
 const sra = [...contracts].find(([, n]) => n === 'SRA')?.[0]
 if (sra) {
@@ -325,16 +481,19 @@ if (sra) {
   await read('SRA', 'SRA admittedCount', () => view(sra, 'admittedCount'))
   await read('SRA', 'SRA orchestratorCount', () => view(sra, 'orchestratorCount'))
   for (const past of [q - 1, q - 2].filter((x) => x >= 1)) {
-    await read('SRA', `SRA aggregatedFilecoinPayVolume(${past})`, () => view(sra, 'aggregatedFilecoinPayVolume', [BigInt(past)]))
+    await read('SRA', `SRA aggregatedFilecoinPayVolume(${past})`, () =>
+      view(sra, 'aggregatedFilecoinPayVolume', [BigInt(past)]),
+    )
   }
   // Per-Orchestrator posted value for the quarter settling now and the one before (fpvOf; quarter Q posts inside Q+1, so
   // fpvOf of the current quarter is always empty), and the Orchestrator each
   // registered pair points to (bindingOf). Orchestrators and pairs come from the record's own events (rvagg's
   // suggested reads, 2026-09-21). fpvOf reads 0 for a quarter whose slot was erased by a newer write.
   const { orchestrators, pairs } = knownFromRecord()
-  for (const orch of orchestrators) for (const qq of [q - 1, q - 2].filter((x) => x >= 1)) {
-    await read('SRA', `SRA fpvOf(${qq}, ${orch})`, () => view(sra, 'fpvOf', [BigInt(qq), orch]))
-  }
+  for (const orch of orchestrators)
+    for (const qq of [q - 1, q - 2].filter((x) => x >= 1)) {
+      await read('SRA', `SRA fpvOf(${qq}, ${orch})`, () => view(sra, 'fpvOf', [BigInt(qq), orch]))
+    }
   for (const [payer, operator] of pairs) {
     await read('SRA', `SRA bindingOf(${payer}, ${operator})`, () => view(sra, 'bindingOf', [payer, operator]))
   }
@@ -342,13 +501,20 @@ if (sra) {
 
 // Admitted Orchestrators and registered pairs, replayed from the events already in the record plus this run's.
 function knownFromRecord() {
-  const past = existsSync(recordsPath) ? readFileSync(recordsPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
-  const orchestrators = new Set(), pairs = new Map()
+  const past = existsSync(recordsPath)
+    ? readFileSync(recordsPath, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+    : []
+  const orchestrators = new Set(),
+    pairs = new Map()
   for (const r of [...past, ...records]) {
     if (r.kind !== 'event' || r.source !== 'SRA') continue
     if (r.name === 'OrchestratorAdmitted') orchestrators.add(r.fields.orch)
     if (r.name === 'OrchestratorRemoved') orchestrators.delete(r.fields.orch)
-    if (r.name === 'BindingDeclared' || r.name === 'BindingReassigned') pairs.set(`${r.fields.payer}|${r.fields.operator}`, [r.fields.payer, r.fields.operator])
+    if (r.name === 'BindingDeclared' || r.name === 'BindingReassigned')
+      pairs.set(`${r.fields.payer}|${r.fields.operator}`, [r.fields.payer, r.fields.operator])
     if (r.name === 'BindingCanceled') pairs.delete(`${r.fields.payer}|${r.fields.operator}`)
   }
   return { orchestrators: [...orchestrators], pairs: [...pairs.values()] }
@@ -357,8 +523,46 @@ function knownFromRecord() {
 records.sort((a, b) => a.epoch - b.epoch)
 if (records.length) appendFileSync(recordsPath, records.map((r) => JSON.stringify(r)).join('\n') + '\n')
 // rpcUrl, f02 and addressPrefix are here for the page's live read of f02
-const { network, rpcUrl, f02, addressPrefix, genesisTimestamp, epochSeconds, activationEpoch, epochsPerQuarter, swaTimelockEpochs, postPeriod, verificationWindow, swa } = cfg
+const {
+  network,
+  rpcUrl,
+  f02,
+  addressPrefix,
+  genesisTimestamp,
+  epochSeconds,
+  activationEpoch,
+  epochsPerQuarter,
+  swaTimelockEpochs,
+  postPeriod,
+  verificationWindow,
+  swa,
+} = cfg
 console.log(`epochs ${from}..${to} (chain head ${chainHead}): ${records.length} new records -> ${recordsPath}`)
 await emailRecords(records, cfg) // email: only failures, control changes, gaps, claim mismatches (lib/notify.js)
 await notify(records, cfg, from, to, status) // Slack, only when SLACK_WEBHOOK is set and the network is not opted out; a failed post waits in status.slackPending
-writeFileSync(statusPath, JSON.stringify({ network, rpcUrl, f02, addressPrefix, genesisTimestamp, epochSeconds, activationEpoch, epochsPerQuarter, swaTimelockEpochs, postPeriod, verificationWindow, swa, lastEpoch: to, lastRun: new Date().toISOString(), reads: status.reads, pending: status.pending, slackPending: status.slackPending }, null, 2))
+writeFileSync(
+  statusPath,
+  JSON.stringify(
+    {
+      network,
+      rpcUrl,
+      f02,
+      addressPrefix,
+      genesisTimestamp,
+      epochSeconds,
+      activationEpoch,
+      epochsPerQuarter,
+      swaTimelockEpochs,
+      postPeriod,
+      verificationWindow,
+      swa,
+      lastEpoch: to,
+      lastRun: new Date().toISOString(),
+      reads: status.reads,
+      pending: status.pending,
+      slackPending: status.slackPending,
+    },
+    null,
+    2,
+  ),
+)

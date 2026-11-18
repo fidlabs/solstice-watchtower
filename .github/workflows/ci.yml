@@ -22,6 +22,7 @@ jobs:
       - run: npm ci
       - run: for f in bin/*.js lib/*.js site/lib/*.js; do node --check "$f"; done
       - run: npm run lint:check
+      - run: npm run format:check
       - run: npm test
       - run: npm run test:alerts
 

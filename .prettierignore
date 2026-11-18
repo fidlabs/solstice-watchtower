@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+site/data/
+package-lock.json
+alerts-service/package-lock.json
+CHANGELOG.md
+.release-please-manifest.json
