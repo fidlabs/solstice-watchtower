@@ -205,8 +205,11 @@ Decisions (Irene, 2026-09-23):
   and tests the mainnet path (endpoint, explorer links) before it matters.
 - Butterfly gamma stays while rvagg's run lasts; butterfly alpha left the page (its record is in `archive/`). Older
   page versions stay reachable at their CIDs, listed in the README.
-- Stable address: the ENS name `https://watchtower.fidl.tech` (registered by Irene 2026-09-22, Jennifer's suggestion),
-  content hash set to the current CID at each publish; https://watchtower.fidl.tech .
+- Stable address: the ENS name `solsticewatchtower.eth` (registered by Irene 2026-09-22, Jennifer's suggestion),
+  content hash set to the current CID at each publish; https://solsticewatchtower.eth.limo/ . This is the original
+  address of the page.
+- New address: the page is being re-hosted by FIDL at https://watchtower.fidl.tech (a DNS domain, not an ENS name);
+  staging at https://staging.watchtower.fidl.tech.
 - The public endpoint capped `eth_getLogs` at 360 blocks in one answer on 2026-09-23 (2880 on 2026-09-18), so the
   reader now asks in chunks of 360.
 
