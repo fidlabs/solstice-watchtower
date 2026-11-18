@@ -2334,3 +2334,4 @@
 {"kind":"read","epoch":4254090,"time":"2026-11-17T20:58:00.000Z","quarter":51,"source":"SRA","name":"SRA fpvOf(50, 0xfF0000000000000000000000000000000000005a)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4254090,"time":"2026-11-17T20:58:00.000Z","quarter":51,"source":"SRA","name":"SRA fpvOf(50, 0x72ad7C4d27fC9C2bDF8fde34ddd9BcbE34648AF3)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4254090,"time":"2026-11-17T20:58:00.000Z","quarter":51,"source":"SRA","name":"SRA fpvOf(50, 0x22B1a2668fbFcb38AaD33E2d1e0b157216a22421)","fields":{"fpv":{"usd":"0"}}}
+{"kind":"message","epoch":4251164,"time":"2026-11-16T20:35:00.000Z","quarter":50,"source":"SRA","name":"submitShares","fields":{"q":"49"},"from":"0xff000000000000000000000000000000000312ea","ok":true,"tx":"0x6b9cbb0c68e010bf981a9fe2a7ac8bb90a88c65a179219076ece529ac7eb0697","raw":{"input":"0x6e78e1d50000000000000000000000000000000000000000000000000000000000000031"}}
