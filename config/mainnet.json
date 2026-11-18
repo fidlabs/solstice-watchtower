@@ -19,8 +19,12 @@
   },
   "wallets": {
     "initialOrchestrator": "0x97A90f5696be5E3C8d3752C92Adac287c2b4484e",
-    "cranker (watchtower backup)": "0x0f1850C4805A45cbeC8E5F42743FCBE63B61DaB8",
-    "claimer (watchtower backup)": "f1x5uqdow6zqtnrsmesuxd3gdbkze5g5iqkpc2lxq"
+    "cranker (fidlabs)": "0x3F75211921B1C3895B0d090529F852F425a897A2",
+    "claimer (fidlabs)": "f1gzqk54bdrfusxk7idqkbg5cqi4k4jnron7lnq4y",
+    "cranker (watchtower backup)": "0xadAf9BD635fA6Cf962918A4F615368ab2a786e10",
+    "claimer (watchtower backup)": "f1qk77smkod64g5lnenlomiid62df2w6wsht56yzy",
+    "cranker (irenegia watchtower, previous)": "0x0f1850C4805A45cbeC8E5F42743FCBE63B61DaB8",
+    "claimer (irenegia watchtower, previous)": "f1x5uqdow6zqtnrsmesuxd3gdbkze5g5iqkpc2lxq"
   },
   "crankDelayEpochs": 2880,
   "crankNote": "backup cranker and Claim keeper. A crank is sent only once its quarter has been bound for crankDelayEpochs (2880 = one day), so the primary cranker goes first; at most crankMaxFeeFil per message. The Claim keeper claims a stream when nobody has claimed it for claimEveryHours (24 = daily, today's behaviour; raise to 192 once fidlabs/solstice-cranker sends the weekly Claim, to make this a backup), at most claimMaxFeeFil per message and 10% of the payout. absenceAlertHours / gateAlertHours: when bin/watch.js calls submitShares / the gate check overdue. Keys: CRANK_KEY_MAINNET (f410, 'cranker (watchtower backup)') and CLAIM_KEY_MAINNET (f1, 'claimer (watchtower backup)'), secrets of the production environment; without them the steps are dry runs.",
