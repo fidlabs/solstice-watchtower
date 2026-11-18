@@ -1,0 +1,82 @@
+name: Manually trigger deploy to staging or production
+run-name: Deploy Watchtower ${{ inputs.version }} to ${{ inputs.environment }}, triggered by ${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Image version already published to ECR, e.g. 1.2.3"
+        required: true
+        type: string
+      environment:
+        description: "Environment to deploy to (production only from main)"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+  workflow_call:
+    inputs:
+      version:
+        description: "Image version, e.g. 1.2.3 or v1.2.3"
+        required: true
+        type: string
+      environment:
+        description: "staging or production"
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID_IMAGE_DEPLOYER:
+        required: true
+      AWS_SECRET_ACCESS_KEY_IMAGE_DEPLOYER:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: watchtower-deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Validate version and environment
+        id: target
+        env:
+          VERSION: ${{ inputs.version }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          version="${VERSION#v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]] || (( ${#version} > 128 )); then
+            echo "::error::Expected a published image version, e.g. 1.2.3 or v1.2.3-rc.1, got '$VERSION'"
+            exit 1
+          fi
+          case "$ENVIRONMENT" in
+            staging) ;;
+            production)
+              if [ "$REF" != refs/heads/main ]; then
+                echo "::error::Production deploys run only from main (this run is on $REF)"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unknown environment '$ENVIRONMENT' (expected staging or production)"
+              exit 1
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy solstice-watchtower-site ${{ steps.target.outputs.version }} to ${{ inputs.environment }}
+        uses: neti-filplus-infra/filplus-deploy-action@8214e7d3a00d64e547024da40e044c04c6dcd13c # main, 2025-05-29
+        with:
+          version: ${{ steps.target.outputs.version }}
+          environment: ${{ inputs.environment }}
+          ecr-repository: solstice-watchtower-site
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_IMAGE_DEPLOYER }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_IMAGE_DEPLOYER }}
+          aws-region: us-east-1

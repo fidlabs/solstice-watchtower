@@ -1,5 +1,5 @@
 name: Publish new build
-run-name: Publish Watchtower ${{ github.event.release.tag_name || inputs.version }}
+run-name: Publish Watchtower ${{ github.event.release.tag_name || inputs.version }}, deploy to ${{ github.event_name == 'release' && 'staging' || inputs.deploy_environment }}
 
 on:
   release:
@@ -10,6 +10,14 @@ on:
         description: "Image version, e.g. 1.2.3"
         required: true
         type: string
+      deploy_environment:
+        description: "Deploy the new image after publishing it"
+        required: false
+        type: choice
+        options:
+          - none
+          - staging
+        default: none
 
 permissions:
   contents: read
@@ -26,3 +34,15 @@ jobs:
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # A release goes to staging on its own; production is always a manual run of manually-trigger-deploy.yml.
+  deploy-staging:
+    needs: build-and-publish
+    if: ${{ github.event_name == 'release' || inputs.deploy_environment == 'staging' }}
+    uses: ./.github/workflows/manually-trigger-deploy.yml
+    with:
+      version: ${{ needs.build-and-publish.outputs.version }}
+      environment: staging
+    secrets:
+      AWS_ACCESS_KEY_ID_IMAGE_DEPLOYER: ${{ secrets.AWS_ACCESS_KEY_ID_IMAGE_DEPLOYER }}
+      AWS_SECRET_ACCESS_KEY_IMAGE_DEPLOYER: ${{ secrets.AWS_SECRET_ACCESS_KEY_IMAGE_DEPLOYER }}
