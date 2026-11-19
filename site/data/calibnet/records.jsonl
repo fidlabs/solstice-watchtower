@@ -2346,3 +2346,4 @@
 {"kind":"read","epoch":4256755,"time":"2026-11-18T19:10:30.000Z","quarter":52,"source":"SRA","name":"SRA fpvOf(51, 0xfF0000000000000000000000000000000000005a)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4256755,"time":"2026-11-18T19:10:30.000Z","quarter":52,"source":"SRA","name":"SRA fpvOf(51, 0x72ad7C4d27fC9C2bDF8fde34ddd9BcbE34648AF3)","fields":{"fpv":{"usd":"0"}}}
 {"kind":"read","epoch":4256755,"time":"2026-11-18T19:10:30.000Z","quarter":52,"source":"SRA","name":"SRA fpvOf(51, 0x22B1a2668fbFcb38AaD33E2d1e0b157216a22421)","fields":{"fpv":{"usd":"0"}}}
+{"kind":"message","epoch":4254043,"time":"2026-11-17T20:34:30.000Z","quarter":51,"source":"SRA","name":"submitShares","fields":{"q":"50"},"from":"0xff000000000000000000000000000000000312ea","ok":true,"tx":"0x46d4c25dab4456317cd021054c0e02d065ee9c6191e340155763307d16fb014b","raw":{"input":"0x6e78e1d50000000000000000000000000000000000000000000000000000000000000032"}}
