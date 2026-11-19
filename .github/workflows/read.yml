@@ -13,11 +13,11 @@ on:
   schedule:
     # Every 10 minutes, but off the round minutes (:00, :10, ...): GitHub's scheduler is "best effort", delays or
     # drops runs when it is busy, and is busiest at the top of the hour. The reader catches up from its last epoch.
-    - cron: '7,17,27,37,47,57 * * * *'
+    - cron: "7,17,27,37,47,57 * * * *"
   workflow_dispatch: # also startable by hand from the Actions tab
     inputs:
       test_slack:
-        description: 'post one marked test line to Slack before reading'
+        description: "post one marked test line to Slack before reading"
         type: boolean
         default: false
 

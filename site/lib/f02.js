@@ -39,7 +39,11 @@ export const idToEthAddress = (id) => '0xff' + BigInt(id).toString(16).padStart(
 
 // WeightRecord tuple: [v_start, slope, t_start, floor, cap]; fractions are fixed point with DENOM = 10^18.
 const weightRecord = ([vStart, slope, tStart, floor, cap]) => ({
-  vStart: str(vStart), slope: str(slope), tStart: Number(tStart), floor: str(floor), cap: str(cap),
+  vStart: str(vStart),
+  slope: str(slope),
+  tStart: Number(tStart),
+  floor: str(floor),
+  cap: str(cap),
 })
 
 // §2.4.1 ComputeWeight: clamp(v_start + slope * (e - t_start), floor, cap). Returns a fraction of 10^18.
@@ -97,7 +101,8 @@ export function decodeActorEvent(event, prefix = 'f') {
 // The block streams_root links to (§2.4.2): [streams, tombstones, pending_writes_queue].
 export function decodeStreamsState(bytes, prefix = 'f') {
   const [streams, tombstones, queue] = dagCbor.decode(bytes)
-  const amounts = (rows) => rows.map(([r, a]) => ({ recipient: addressFromBytes(r, prefix), amountAttoFil: bigFromBytes(a).toString() }))
+  const amounts = (rows) =>
+    rows.map(([r, a]) => ({ recipient: addressFromBytes(r, prefix), amountAttoFil: bigFromBytes(a).toString() }))
   return {
     streams: streams.map(([id, w, dist]) => ({
       id: Number(id),
@@ -130,11 +135,13 @@ export const slotOf = (w) => `${w.op}|${w.streamId ?? ''}`
 //   gone, and the state shows the payload   -> 'applied'
 //   gone, and the state does not show it    -> 'dropped or replaced'  (a later write may have overwritten it)
 export function writeOutcome(write, state) {
-  if (state.pendingWrites.some((p) => slotOf(p) === slotOf(write) && p.effectiveEpoch === write.effectiveEpoch)) return 'still queued'
+  if (state.pendingWrites.some((p) => slotOf(p) === slotOf(write) && p.effectiveEpoch === write.effectiveEpoch))
+    return 'still queued'
   const stream = (id) => state.streams.find((s) => s.id === id)
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   let shown
-  if (write.op === 'SetWeightRecords' || write.op === 'StepWeightRecords') shown = write.payload.updates.every((u) => same(stream(u.id)?.weight, u.record))
+  if (write.op === 'SetWeightRecords' || write.op === 'StepWeightRecords')
+    shown = write.payload.updates.every((u) => same(stream(u.id)?.weight, u.record))
   else if (write.op === 'RegisterStream') shown = same(stream(write.streamId)?.weight, write.payload.record)
   else if (write.op === 'RemoveStream') shown = !stream(write.streamId)
   else if (write.op === 'SetDistribution') shown = stream(write.streamId)?.distribution?.writer === write.payload.writer
@@ -147,9 +154,13 @@ export function decodeF02Params(method, v, prefix = 'f') {
   const addr = (b) => addressFromBytes(b, prefix)
   const str = (x) => (typeof x === 'bigint' ? x.toString() : String(x))
   switch (method) {
-    case 'Claim': return { streamId: Number(v[0]), wallets: v[1].map(addr) }
-    case 'SetShares': return { streamId: Number(v[0]), shares: v[1].map(([r, sh]) => ({ recipient: addr(r), share: str(sh) })) }
-    case 'ReplaceAddress': return { streamId: Number(v[0]), oldAddress: addr(v[1]), newAddress: addr(v[2]) }
-    default: return v
+    case 'Claim':
+      return { streamId: Number(v[0]), wallets: v[1].map(addr) }
+    case 'SetShares':
+      return { streamId: Number(v[0]), shares: v[1].map(([r, sh]) => ({ recipient: addr(r), share: str(sh) })) }
+    case 'ReplaceAddress':
+      return { streamId: Number(v[0]), oldAddress: addr(v[1]), newAddress: addr(v[2]) }
+    default:
+      return v
   }
 }

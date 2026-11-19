@@ -6,8 +6,14 @@
 import { writeFileSync, existsSync } from 'node:fs'
 import { create } from 'iso-filecoin/wallet'
 const [net, out] = process.argv.slice(2)
-if (!['mainnet', 'testnet'].includes(net) || !out) { console.error('usage: node bin/newkey.js mainnet|testnet <key file>'); process.exit(1) }
-if (existsSync(out)) { console.error(`${out} exists; refusing to overwrite a key`); process.exit(1) }
+if (!['mainnet', 'testnet'].includes(net) || !out) {
+  console.error('usage: node bin/newkey.js mainnet|testnet <key file>')
+  process.exit(1)
+}
+if (existsSync(out)) {
+  console.error(`${out} exists; refusing to overwrite a key`)
+  process.exit(1)
+}
 const a = create('SECP256K1', net)
 writeFileSync(out, Buffer.from(a.privateKey).toString('hex') + '\n', { mode: 0o600 })
 console.log(`address    ${a.address.toString()}`)

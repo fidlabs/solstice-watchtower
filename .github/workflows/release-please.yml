@@ -3,7 +3,7 @@ name: Release Please
 on:
   push:
     branches: [main]
-    paths-ignore: ['site/data/**']
+    paths-ignore: ["site/data/**"]
   workflow_dispatch:
 
 permissions:

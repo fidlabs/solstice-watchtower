@@ -195,6 +195,7 @@ carries nothing over: no owner action, no lists, no pricing params. The two `set
 of 2026-09-21 went to the old SRA and must be sent again on the new one.
 
 Decisions (Irene, 2026-09-23):
+
 - `config/calibnet.json` points to the new contracts, from epoch 4092521 (three before the new SRA deployment); the
   record of the first deployment is frozen in `site/data/calibnet-2026-09-17/` and the page shows it as the last group
   of the calibnet history, with a note. One calibnet view, not two.
@@ -205,7 +206,10 @@ Decisions (Irene, 2026-09-23):
 - Butterfly gamma stays while rvagg's run lasts; butterfly alpha left the page (its record is in `archive/`). Older
   page versions stay reachable at their CIDs, listed in the README.
 - Stable address: the ENS name `solsticewatchtower.eth` (registered by Irene 2026-09-22, Jennifer's suggestion),
-  content hash set to the current CID at each publish; https://solsticewatchtower.eth.limo/ .
+  content hash set to the current CID at each publish; https://solsticewatchtower.eth.limo/ . This is the original
+  address of the page.
+- New address: the page is being re-hosted by FIDL at https://watchtower.fidl.tech (a DNS domain, not an ENS name);
+  staging at https://staging.watchtower.fidl.tech.
 - The public endpoint capped `eth_getLogs` at 360 blocks in one answer on 2026-09-23 (2880 on 2026-09-18), so the
   reader now asks in chunks of 360.
 
@@ -254,7 +258,7 @@ A step of the read workflow runs it on calibnet after the readers:
   (`crankDelayEpochs` 2880) before a crank is sent. Dry runs until the secrets and the wallet addresses are in place.
 - The daily `Claim` is a second step, `bin/claim.js` (2026-10-12): once a day it reads the f02 state, lists every
   wallet in a live stream's share map or payable rows and every tombstone's payable rows, simulates `Claim(id,
-  wallets)` per stream with `Filecoin.StateCall`, and sends only a batch that would pay something. `Claim` is a native
+wallets)` per stream with `Filecoin.StateCall`, and sends only a batch that would pay something. `Claim` is a native
   f02 message, so its key is a separate f1 account (repository secret `CLAIM_KEY`; the run checks that the key's
   address is the configured `claimer (watchtower backup)` wallet, after a secret mix-up on 2026-10-12). A backup: Claims
   are already sent on calibnet from another f1 address (t15gfg…), daily for A's wallet; the public solstice-cranker
@@ -279,7 +283,7 @@ A step of the read workflow runs it on calibnet after the readers:
    - A gap that cannot be healed is recorded, not hidden. If the endpoint no longer serves the blocks of the
      gap (limit 2 above), the job writes one record "epochs X to Y could not be read", and the page shows it
      in the history, so silence is never taken for "nothing happened".
-   Telling a person that the job stopped is the alert, which is outside the PoC.
+     Telling a person that the job stopped is the alert, which is outside the PoC.
 3. Hosting (decided 2026-09-17 and 2026-09-18): the website is served from IPFS/Filecoin through Filecoin
    Pin, not from GitHub Pages. The page is fixed and is re-published only when the page itself changes, so it
    has one stable link. When it opens, it fetches the record from this repo, where the scheduled job commits

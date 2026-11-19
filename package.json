@@ -9,7 +9,9 @@
     "page": "python3 -m http.server 8000 --directory site",
     "lint": "eslint . --fix",
     "lint:check": "eslint . --max-warnings=0",
-    "test:alerts": "npm test --prefix alerts-service"
+    "test:alerts": "npm test --prefix alerts-service",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "dependencies": {
     "@ipld/dag-cbor": "^9.2.0",
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
-    "globals": "^17.14.0"
+    "globals": "^17.14.0",
+    "prettier": "3.10.1"
   }
 }

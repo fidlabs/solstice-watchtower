@@ -1,474 +1,1116 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Solstice watchtower</title>
-<style>
-  /* Restyle 2026-10-15 (Irene: "still very simple but nicer"): same structure and texts, CSS only, no web font. */
-  :root { --bg:#f6f5f1; --fg:#1b1b19; --muted:#6a6962; --line:#e3e2db; --card:#fff; --stripe:#f8f8f5; --bad:#b3261e; --bad-bg:#fbe9e7; --ok:#1a7f37; --ok-bg:#e6f4ea; --warn-bg:#fff1cc; --accent:#0b57d0; --shadow:0 1px 2px rgba(0,0,0,.06); --net:#0b57d0; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --fg:#e8e7e2; --muted:#9f9e97; --line:#2f2f2b; --card:#1c1c1a; --stripe:#212120; --bad:#ff8a80; --bad-bg:#4a211d; --ok:#7bd88f; --ok-bg:#1a3b26; --warn-bg:#3f3412; --accent:#8ab4f8; --shadow:none; } }
-  body { margin:0; padding:28px 16px 64px; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width:1100px; margin:0 auto; }
-  h1 { font-size:28px; letter-spacing:-.01em; margin:0 0 10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-  h2 { font-size:19px; margin:44px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--line); }
-  a { color:var(--accent); } .muted { color:var(--muted); } .bad { color:var(--bad); font-weight:600; } .ok { color:var(--ok); }
-  #head { font-size:14px; }
-  .banner { background:var(--warn-bg); padding:10px 14px; border-radius:8px; margin:14px 0; font-weight:600; }
-  .banner.stopped { background:var(--bad); color:#fff; }
-  .scroll { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); margin:8px 0 14px; }
-  table { border-collapse:collapse; width:100%; font-size:14px; }
-  th, td { text-align:left; vertical-align:top; padding:8px 12px; border-bottom:1px solid var(--line); }
-  th { color:var(--muted); font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; position:sticky; top:0; background:var(--card); }
-  tbody tr:nth-child(even) td { background:var(--stripe); } tr:last-child td { border-bottom:0; }
-  td.nowrap { white-space:nowrap; } td.result { min-width:170px; max-width:260px; overflow-wrap:anywhere; } code, pre { font:12.5px ui-monospace, Menlo, monospace; }
-  pre { margin:6px 0 0; white-space:pre-wrap; word-break:break-all; color:var(--muted); }
-  /* Status words in the result column as small badges. */
-  td.result > span.ok, td.result > span.bad { display:inline-block; padding:1px 9px; border-radius:999px; font-size:12.5px; font-weight:600; line-height:1.5; }
-  td.result > span.ok { background:var(--ok-bg); } td.result > span.bad { background:var(--bad-bg); }
-  details.quarter { margin:12px 0; } details.quarter > summary { cursor:pointer; font-weight:600; padding:6px 0; }
-  details.row > summary { cursor:pointer; list-style:none; } details.row > summary::-webkit-details-marker { display:none; }
-  details.fold > summary::before { content:'▸ '; } details.fold[open] > summary::before { content:'▾ '; } /* the two folded lists in At a glance: a visible arrow, so people see they open */
-  .filters { display:flex; gap:16px; flex-wrap:wrap; margin:10px 0; font-size:14px; }
-  /* The network bar: one colour per network, so a visitor sees at once which chain the page shows. */
-  body { border-top:8px solid var(--net); } body[data-net='mainnet'] { --net:#1a7f37; }
-  .net { display:inline-block; padding:3px 13px; border-radius:999px; background:var(--net); color:#fff; font-size:15px; font-weight:700; }
-  .views { margin:4px 0 8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:14px; }
-  .views a { display:inline-block; padding:3px 12px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--fg); text-decoration:none; }
-  .views a.here { font-weight:700; background:var(--net); border-color:var(--net); color:#fff; }
-  footer { margin-top:56px; padding-top:14px; border-top:1px solid var(--line); font-size:13px; }
-  details#glance { margin:16px 0 4px; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:12px 16px; }
-  details#glance > summary { cursor:pointer; font-weight:600; font-size:17px; }
-  .glance-row { margin:10px 0 2px; font-size:14px; } .glance-row b { font-weight:600; }
-  .bar { position:relative; display:flex; height:28px; margin:8px 0 4px; border-radius:7px; overflow:hidden; font-size:11.5px; }
-  .bar > div { display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; color:#fff; }
-  .seg-post { background:#6d5bd0; } .seg-verify { background:#b0713a; } .seg-bound { background:#2f7d57; } .seg-cut { background:#8a8a84; } .seg-none { background:var(--line); color:var(--fg) !important; }
-  .now { position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--fg); }
-  .phases { list-style:none; margin:6px 0 0; padding:0; font-size:13px; display:flex; flex-wrap:wrap; gap:6px 14px; } .phases li { margin:0; }
-  .dot { display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
-  .phases li.here { font-weight:600; }
-  table.params { margin-top:8px; font-size:13px; } table.params td { padding:4px 8px; } table.params td:first-child { white-space:nowrap; }
-</style>
-</head>
-<body>
-<main>
-  <h1>Solstice watchtower <span id="net" class="net"></span></h1>
-  <div id="views" class="views muted"></div>
-  <div id="head" class="muted">loading…</div>
-  <div id="banner"></div>
-  <details id="glance" open><summary>At a glance</summary><div id="glanceStreams" class="glance-row muted">streams: waiting for the live read…</div><div id="glanceQuarter"></div><div id="glanceGate"></div><div id="glanceParams"></div><div id="glanceTasks"></div></details>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Solstice watchtower</title>
+    <style>
+      /* Restyle 2026-10-15 (Irene: "still very simple but nicer"): same structure and texts, CSS only, no web font. */
+      :root {
+        --bg: #f6f5f1;
+        --fg: #1b1b19;
+        --muted: #6a6962;
+        --line: #e3e2db;
+        --card: #fff;
+        --stripe: #f8f8f5;
+        --bad: #b3261e;
+        --bad-bg: #fbe9e7;
+        --ok: #1a7f37;
+        --ok-bg: #e6f4ea;
+        --warn-bg: #fff1cc;
+        --accent: #0b57d0;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        --net: #0b57d0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141413;
+          --fg: #e8e7e2;
+          --muted: #9f9e97;
+          --line: #2f2f2b;
+          --card: #1c1c1a;
+          --stripe: #212120;
+          --bad: #ff8a80;
+          --bad-bg: #4a211d;
+          --ok: #7bd88f;
+          --ok-bg: #1a3b26;
+          --warn-bg: #3f3412;
+          --accent: #8ab4f8;
+          --shadow: none;
+        }
+      }
+      body {
+        margin: 0;
+        padding: 28px 16px 64px;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          16px/1.5 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 28px;
+        letter-spacing: -0.01em;
+        margin: 0 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 44px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid var(--line);
+      }
+      a {
+        color: var(--accent);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .bad {
+        color: var(--bad);
+        font-weight: 600;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      #head {
+        font-size: 14px;
+      }
+      .banner {
+        background: var(--warn-bg);
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin: 14px 0;
+        font-weight: 600;
+      }
+      .banner.stopped {
+        background: var(--bad);
+        color: #fff;
+      }
+      .scroll {
+        overflow-x: auto;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        margin: 8px 0 14px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        background: var(--card);
+      }
+      tbody tr:nth-child(even) td {
+        background: var(--stripe);
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td.nowrap {
+        white-space: nowrap;
+      }
+      td.result {
+        min-width: 170px;
+        max-width: 260px;
+        overflow-wrap: anywhere;
+      }
+      code,
+      pre {
+        font:
+          12.5px ui-monospace,
+          Menlo,
+          monospace;
+      }
+      pre {
+        margin: 6px 0 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: var(--muted);
+      }
+      /* Status words in the result column as small badges. */
+      td.result > span.ok,
+      td.result > span.bad {
+        display: inline-block;
+        padding: 1px 9px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+      td.result > span.ok {
+        background: var(--ok-bg);
+      }
+      td.result > span.bad {
+        background: var(--bad-bg);
+      }
+      details.quarter {
+        margin: 12px 0;
+      }
+      details.quarter > summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 6px 0;
+      }
+      details.row > summary {
+        cursor: pointer;
+        list-style: none;
+      }
+      details.row > summary::-webkit-details-marker {
+        display: none;
+      }
+      details.fold > summary::before {
+        content: '▸ ';
+      }
+      details.fold[open] > summary::before {
+        content: '▾ ';
+      } /* the two folded lists in At a glance: a visible arrow, so people see they open */
+      .filters {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin: 10px 0;
+        font-size: 14px;
+      }
+      /* The network bar: one colour per network, so a visitor sees at once which chain the page shows. */
+      body {
+        border-top: 8px solid var(--net);
+      }
+      body[data-net='mainnet'] {
+        --net: #1a7f37;
+      }
+      .net {
+        display: inline-block;
+        padding: 3px 13px;
+        border-radius: 999px;
+        background: var(--net);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .views {
+        margin: 4px 0 8px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        font-size: 14px;
+      }
+      .views a {
+        display: inline-block;
+        padding: 3px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--fg);
+        text-decoration: none;
+      }
+      .views a.here {
+        font-weight: 700;
+        background: var(--net);
+        border-color: var(--net);
+        color: #fff;
+      }
+      footer {
+        margin-top: 56px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+      }
+      details#glance {
+        margin: 16px 0 4px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        padding: 12px 16px;
+      }
+      details#glance > summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 17px;
+      }
+      .glance-row {
+        margin: 10px 0 2px;
+        font-size: 14px;
+      }
+      .glance-row b {
+        font-weight: 600;
+      }
+      .bar {
+        position: relative;
+        display: flex;
+        height: 28px;
+        margin: 8px 0 4px;
+        border-radius: 7px;
+        overflow: hidden;
+        font-size: 11.5px;
+      }
+      .bar > div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        overflow: hidden;
+        color: #fff;
+      }
+      .seg-post {
+        background: #6d5bd0;
+      }
+      .seg-verify {
+        background: #b0713a;
+      }
+      .seg-bound {
+        background: #2f7d57;
+      }
+      .seg-cut {
+        background: #8a8a84;
+      }
+      .seg-none {
+        background: var(--line);
+        color: var(--fg) !important;
+      }
+      .now {
+        position: absolute;
+        top: -3px;
+        bottom: -3px;
+        width: 3px;
+        background: var(--fg);
+      }
+      .phases {
+        list-style: none;
+        margin: 6px 0 0;
+        padding: 0;
+        font-size: 13px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+      }
+      .phases li {
+        margin: 0;
+      }
+      .dot {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+      .phases li.here {
+        font-weight: 600;
+      }
+      table.params {
+        margin-top: 8px;
+        font-size: 13px;
+      }
+      table.params td {
+        padding: 4px 8px;
+      }
+      table.params td:first-child {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Solstice watchtower <span id="net" class="net"></span></h1>
+      <div id="views" class="views muted"></div>
+      <div id="head" class="muted">loading…</div>
+      <div id="banner"></div>
+      <details id="glance" open>
+        <summary>At a glance</summary>
+        <div id="glanceStreams" class="glance-row muted">streams: waiting for the live read…</div>
+        <div id="glanceQuarter"></div>
+        <div id="glanceGate"></div>
+        <div id="glanceParams"></div>
+        <div id="glanceTasks"></div>
+      </details>
 
-  <h2>1. Queued writes</h2>
-  <div class="muted">Writes waiting in the f02 pending-write queue. Time left runs in your browser.</div>
-  <div id="live"></div>
-  <div class="muted">Recorded by the reader:</div>
-  <div id="queue"></div>
+      <h2>1. Queued writes</h2>
+      <div class="muted">Writes waiting in the f02 pending-write queue. Time left runs in your browser.</div>
+      <div id="live"></div>
+      <div class="muted">Recorded by the reader:</div>
+      <div id="queue"></div>
 
-  <h2>2. What landed</h2>
-  <div class="muted">Result: for a message, <b>ok</b> or <b>failed</b> with the reason (reverted by the contract, out of gas, or the call inside a Safe failed); for a claim check, whether the wallet balance moved by the event's amount;
-    for a gap (epochs the reader could not read from the node), <b>not read</b>. Events have no result of their own: the result is on the message that emitted them.</div>
-  <div class="filters">
-    <label>Source <select id="fSource"><option value="">all</option><option>f02</option><option>SRA</option><option>SWA</option></select></label>
-    <label><input type="checkbox" id="fBad"> only failed messages</label>
-  </div>
-  <div id="landed"></div>
+      <h2>2. What landed</h2>
+      <div class="muted">
+        Result: for a message, <b>ok</b> or <b>failed</b> with the reason (reverted by the contract, out of gas, or the
+        call inside a Safe failed); for a claim check, whether the wallet balance moved by the event's amount; for a gap
+        (epochs the reader could not read from the node), <b>not read</b>. Events have no result of their own: the
+        result is on the message that emitted them.
+      </div>
+      <div class="filters">
+        <label
+          >Source
+          <select id="fSource">
+            <option value="">all</option>
+            <option>f02</option>
+            <option>SRA</option>
+            <option>SWA</option>
+          </select></label
+        >
+        <label><input type="checkbox" id="fBad" /> only failed messages</label>
+      </div>
+      <div id="landed"></div>
 
-  <h2>3. State</h2>
-  <div class="muted">Values that leave no event. Each line shows the last value read and when it last changed.</div>
-  <div id="state"></div>
-  <section id="alerts" hidden>
-    <h2>Email alerts</h2>
-    <div class="muted">Get an email when something needs attention on mainnet: submitShares or the gate check overdue, a failed
-      SRA/SWA/f02 message, a contract upgrade or owner change, a gap in the record, or the watchtower itself going quiet.
-      A confirmation link comes first; every email has an unsubscribe link.</div>
-    <form id="alertsForm"><input type="email" name="email" required placeholder="you@example.org" autocomplete="email">
-      <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px">
-      <button type="submit">Subscribe</button> <span id="alertsMsg" class="muted"></span></form>
-  </section>
-  <footer class="muted"><div id="netnote"></div><div id="foot"></div></footer>
-</main>
+      <h2>3. State</h2>
+      <div class="muted">Values that leave no event. Each line shows the last value read and when it last changed.</div>
+      <div id="state"></div>
+      <section id="alerts" hidden>
+        <h2>Email alerts</h2>
+        <div class="muted">
+          Get an email when something needs attention on mainnet: submitShares or the gate check overdue, a failed
+          SRA/SWA/f02 message, a contract upgrade or owner change, a gap in the record, or the watchtower itself going
+          quiet. A confirmation link comes first; every email has an unsubscribe link.
+        </div>
+        <form id="alertsForm">
+          <input type="email" name="email" required placeholder="you@example.org" autocomplete="email" />
+          <input
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+            aria-hidden="true"
+            style="position: absolute; left: -10000px"
+          />
+          <button type="submit">Subscribe</button> <span id="alertsMsg" class="muted"></span>
+        </form>
+      </section>
+      <footer class="muted">
+        <div id="netnote"></div>
+        <div id="foot"></div>
+      </footer>
+    </main>
 
-<script type="importmap">{ "imports": { "@ipld/dag-cbor": "https://cdn.jsdelivr.net/npm/@ipld/dag-cbor@9.2.0/+esm" } }</script>
-<script type="module">
-// The page displays the record written by bin/reader.js, and reads f02 live from the chain for parts 1 and 3.
-// The f02 decoder is the same file the reader uses.
-import { decodeStreamsState, computeWeight as weightNow, fromBase64 } from './lib/f02.js'
+    <script type="importmap">
+      { "imports": { "@ipld/dag-cbor": "https://cdn.jsdelivr.net/npm/@ipld/dag-cbor@9.2.0/+esm" } }
+    </script>
+    <script type="module">
+      // The page displays the record written by bin/reader.js, and reads f02 live from the chain for parts 1 and 3.
+      // The f02 decoder is the same file the reader uses.
+      import { decodeStreamsState, computeWeight as weightNow, fromBase64 } from './lib/f02.js'
 
-// The repo the scheduled job commits the record to. The page asks it first, so the record is fresh even when
-// this page was published long ago; the copy bundled next to the page is the fallback.
-const REPO_RAW = 'https://raw.githubusercontent.com/fidlabs/solstice-watchtower/main/site/'
-const STALE_MINUTES = 30
-// The email alert service (alerts-service/). Empty: the sign-up form stays hidden. Its ALLOWED_ORIGINS must include
-// the origin this page is served from.
-const ALERTS_URL = ''
-// Views of a network the scheduled job still watches: they get the repo fetch, the "reader stopped" warning and the
-// live read of f02. The other views are fixed records.
-const LIVE = ['mainnet', 'calibnet']
-// The views, each with the note shown on top. mainnet is the default since 2026-10-16 (the activation week).
-const VIEWS = { mainnet: 'mainnet', calibnet: 'calibnet' }
-const NOTES = {
-  calibnet: 'Calibnet, the live record. Contracts redeployed on 2026-09-22 (SRA 0x0339f205…96a9, SWA 0x66C11A9F…1421); FIP-0118 activates at epoch 4109134 (Mon 2026-09-28 13:00 UTC), ' +
-    'with 1-day quarters and a 6-hour SWA_TIMELOCK.',
-  mainnet: 'MAINNET. The SRA and SWA were deployed on 2026-09-22 at the same addresses as on calibnet. FIP-0118 activates at epoch 6470280 (Mon 2026-10-19 13:00 UTC, ' +
-    'Lotus v1.37.0 upgrade epoch 6470279); before it, f02 has no queue and this page shows only the deployment events and governance actions. Quarters of 262,974 epochs (about 91 days), 7-day SWA_TIMELOCK.',
-}
-const requested = new URLSearchParams(location.search).get('data')
-const dataset = requested in NOTES ? requested : 'mainnet'
-const dir = `data/${dataset}/`
-const $ = (id) => document.getElementById(id)
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-const utc = (iso) => iso.replace('T', ' ').slice(0, 16) + ' UTC'
+      // The repo the scheduled job commits the record to. The page asks it first, so the record is fresh even when
+      // this page was published long ago; the copy bundled next to the page is the fallback.
+      const REPO_RAW = 'https://raw.githubusercontent.com/fidlabs/solstice-watchtower/main/site/'
+      const STALE_MINUTES = 30
+      // The email alert service (alerts-service/). Empty: the sign-up form stays hidden. Its ALLOWED_ORIGINS must include
+      // the origin this page is served from.
+      const ALERTS_URL = ''
+      // Views of a network the scheduled job still watches: they get the repo fetch, the "reader stopped" warning and the
+      // live read of f02. The other views are fixed records.
+      const LIVE = ['mainnet', 'calibnet']
+      // The views, each with the note shown on top. mainnet is the default since 2026-10-16 (the activation week).
+      const VIEWS = { mainnet: 'mainnet', calibnet: 'calibnet' }
+      const NOTES = {
+        calibnet:
+          'Calibnet, the live record. Contracts redeployed on 2026-09-22 (SRA 0x0339f205…96a9, SWA 0x66C11A9F…1421); FIP-0118 activates at epoch 4109134 (Mon 2026-09-28 13:00 UTC), ' +
+          'with 1-day quarters and a 6-hour SWA_TIMELOCK.',
+        mainnet:
+          'MAINNET. The SRA and SWA were deployed on 2026-09-22 at the same addresses as on calibnet. FIP-0118 activates at epoch 6470280 (Mon 2026-10-19 13:00 UTC, ' +
+          'Lotus v1.37.0 upgrade epoch 6470279); before it, f02 has no queue and this page shows only the deployment events and governance actions. Quarters of 262,974 epochs (about 91 days), 7-day SWA_TIMELOCK.',
+      }
+      const requested = new URLSearchParams(location.search).get('data')
+      const dataset = requested in NOTES ? requested : 'mainnet'
+      const dir = `data/${dataset}/`
+      const $ = (id) => document.getElementById(id)
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+      const utc = (iso) => iso.replace('T', ' ').slice(0, 16) + ' UTC'
 
-// Display units. The raw integer is always in the expanded row.
-const E18 = 10n ** 18n
-const scaled = (v, div, digits) => { const n = BigInt(v); const s = (n < 0n ? -n : n) * 10n ** BigInt(digits) / div; const t = s.toString().padStart(digits + 1, '0'); return (n < 0n ? '-' : '') + t.slice(0, -digits) + '.' + t.slice(-digits) }
-function show(key, v) {
-  if (v === null || v === undefined) return '–'
-  if (typeof v === 'object') return Object.entries(v).map(([k, x]) => `${k}: ${show(k, x)}`).join(', ')
-  if (/^-?\d+$/.test(v)) {
-    if (/attoFil$/i.test(key) || ['difference', 'balanceBefore', 'balanceAfter'].includes(key)) return scaled(v, E18, 4) + ' FIL'
-    if (['volume', 'usd', 'totalUsd', 'fpv', 'value', 'base'].includes(key)) return scaled(v, E18, 2) + ' USD'
-    if (['vStart', 'floor', 'cap', 'share'].includes(key)) return scaled(v, 10n ** 16n, 2) + '%'
-  }
-  return String(v)
-}
-const summary = (fields) => Object.entries(fields ?? {}).map(([k, v]) => `${esc(k)}: ${esc(show(k, v))}`).join(' · ')
+      // Display units. The raw integer is always in the expanded row.
+      const E18 = 10n ** 18n
+      const scaled = (v, div, digits) => {
+        const n = BigInt(v)
+        const s = ((n < 0n ? -n : n) * 10n ** BigInt(digits)) / div
+        const t = s.toString().padStart(digits + 1, '0')
+        return (n < 0n ? '-' : '') + t.slice(0, -digits) + '.' + t.slice(-digits)
+      }
+      function show(key, v) {
+        if (v === null || v === undefined) return '–'
+        if (typeof v === 'object')
+          return Object.entries(v)
+            .map(([k, x]) => `${k}: ${show(k, x)}`)
+            .join(', ')
+        if (/^-?\d+$/.test(v)) {
+          if (/attoFil$/i.test(key) || ['difference', 'balanceBefore', 'balanceAfter'].includes(key))
+            return scaled(v, E18, 4) + ' FIL'
+          if (['volume', 'usd', 'totalUsd', 'fpv', 'value', 'base'].includes(key)) return scaled(v, E18, 2) + ' USD'
+          if (['vStart', 'floor', 'cap', 'share'].includes(key)) return scaled(v, 10n ** 16n, 2) + '%'
+        }
+        return String(v)
+      }
+      const summary = (fields) =>
+        Object.entries(fields ?? {})
+          .map(([k, v]) => `${esc(k)}: ${esc(show(k, v))}`)
+          .join(' · ')
 
-function timeLeft(epochs, epochSeconds) {
-  if (epochs <= 0) return '<span class="muted">effective epoch passed</span>'
-  const min = Math.round(epochs * epochSeconds / 60)
-  return min >= 1440 ? `${Math.floor(min / 1440)} d ${Math.floor(min % 1440 / 60)} h` : `${Math.floor(min / 60)} h ${min % 60} min`
-}
+      function timeLeft(epochs, epochSeconds) {
+        if (epochs <= 0) return '<span class="muted">effective epoch passed</span>'
+        const min = Math.round((epochs * epochSeconds) / 60)
+        return min >= 1440
+          ? `${Math.floor(min / 1440)} d ${Math.floor((min % 1440) / 60)} h`
+          : `${Math.floor(min / 60)} h ${min % 60} min`
+      }
 
-const slot = (w) => `${w.op}|${w.streamId ?? ''}|${w.effectiveEpoch}`
+      const slot = (w) => `${w.op}|${w.streamId ?? ''}|${w.effectiveEpoch}`
 
-async function main() {
-  // Record: the repo first (not when developing on localhost, and only for the real record), else the bundled copy.
-  const load = (base) => Promise.all([fetch(base + dir + 'status.json').then((r) => r.ok ? r.json() : Promise.reject(r.status)), fetch(base + dir + 'records.jsonl').then((r) => r.ok ? r.text() : Promise.reject(r.status))])
-  const useRepo = LIVE.includes(dataset) && !['localhost', '127.0.0.1'].includes(location.hostname)
-  let from = 'the copy published with this page'
-  const [status, text] = await (useRepo ? load(REPO_RAW).then((x) => (from = 'the repo', x)).catch(() => load('')) : load(''))
-  const records = text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).sort((a, b) => a.epoch - b.epoch)
-  records0 = records
-  const nowEpoch = () => Math.floor((Date.now() / 1000 - status.genesisTimestamp) / status.epochSeconds)
-  const quarterStart = (q) => status.activationEpoch + (q - 1) * status.epochsPerQuarter
-  const epochTime = (e) => new Date((status.genesisTimestamp + e * status.epochSeconds) * 1000).toISOString()
-  const quarterNow = status.activationEpoch && nowEpoch() >= status.activationEpoch ? Math.floor((nowEpoch() - status.activationEpoch) / status.epochsPerQuarter) + 1 : 0
+      async function main() {
+        // Record: the repo first (not when developing on localhost, and only for the real record), else the bundled copy.
+        const load = (base) =>
+          Promise.all([
+            fetch(base + dir + 'status.json').then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
+            fetch(base + dir + 'records.jsonl').then((r) => (r.ok ? r.text() : Promise.reject(r.status))),
+          ])
+        const useRepo = LIVE.includes(dataset) && !['localhost', '127.0.0.1'].includes(location.hostname)
+        let from = 'the copy published with this page'
+        const [status, text] = await (useRepo
+          ? load(REPO_RAW)
+              .then((x) => ((from = 'the repo'), x))
+              .catch(() => load(''))
+          : load(''))
+        const records = text
+          .split('\n')
+          .filter(Boolean)
+          .map((l) => JSON.parse(l))
+          .sort((a, b) => a.epoch - b.epoch)
+        records0 = records
+        const nowEpoch = () => Math.floor((Date.now() / 1000 - status.genesisTimestamp) / status.epochSeconds)
+        const quarterStart = (q) => status.activationEpoch + (q - 1) * status.epochsPerQuarter
+        const epochTime = (e) => new Date((status.genesisTimestamp + e * status.epochSeconds) * 1000).toISOString()
+        const quarterNow =
+          status.activationEpoch && nowEpoch() >= status.activationEpoch
+            ? Math.floor((nowEpoch() - status.activationEpoch) / status.epochsPerQuarter) + 1
+            : 0
 
-  $('net').textContent = status.network
-  document.body.dataset.net = status.network === 'mainnet' ? 'mainnet' : 'calibnet'
-  explorer = status.network === 'mainnet' ? 'https://filfox.info/en/message/' : 'https://calibration.filfox.info/en/message/'
-  $('views').innerHTML = 'You are looking at <b>' + esc(status.network) + '</b>. Other networks: ' +
-    Object.entries(VIEWS).map(([k, v]) => k === dataset ? `<a class="here">${v}</a>` : `<a href="${k === 'mainnet' ? '?' : `?data=${k}`}">${v}</a>`).join(' | ')
-  $('head').innerHTML = `last epoch read ${status.lastEpoch} (${utc(epochTime(status.lastEpoch))}) · ` +
-    (quarterNow ? `quarter ${quarterNow} now` : 'before activation') + ` · <a href="${dir}records.jsonl">record file</a>`
-  // The network note is background, not a warning: it sits in the footer. Only warnings (the stopped reader) go on top.
-  if (NOTES[dataset]) $('netnote').innerHTML = `<p><b>About this network.</b> ${esc(NOTES[dataset])}</p>`
-  $('head').innerHTML += ` · record from ${from}`
-  // Rule: a reader that stopped must be visible. The live read below does not depend on the reader.
-  const ageMin = Math.round((Date.now() - new Date(status.lastRun)) / 60000)
-  if (LIVE.includes(dataset) && ageMin > STALE_MINUTES) $('banner').innerHTML += `<div class="banner stopped">The reader has not run since ${utc(status.lastRun)} (${ageMin} minutes ago). The history below may be incomplete.</div>`
-  glanceQuarter(status, records, nowEpoch, epochTime, quarterStart)
-  glanceOrchestrators(records)
-  glanceParams(status, records, nowEpoch, epochTime, quarterStart)
-  glanceTasks(status, records, nowEpoch)
-  try { const g = $('glance'); if (localStorage.getItem('glance') === 'closed') g.open = false; g.ontoggle = () => { try { localStorage.setItem('glance', g.open ? 'open' : 'closed') } catch {} } } catch {}
-  liveRead(status, nowEpoch, epochTime).catch((err) => { $('live').innerHTML = `<div class="banner stopped">Live read of f02 failed: ${esc(err.message)}. Parts 1 and 3 show recorded values only.</div>` })
+        $('net').textContent = status.network
+        document.body.dataset.net = status.network === 'mainnet' ? 'mainnet' : 'calibnet'
+        explorer =
+          status.network === 'mainnet'
+            ? 'https://filfox.info/en/message/'
+            : 'https://calibration.filfox.info/en/message/'
+        $('views').innerHTML =
+          'You are looking at <b>' +
+          esc(status.network) +
+          '</b>. Other networks: ' +
+          Object.entries(VIEWS)
+            .map(([k, v]) =>
+              k === dataset ? `<a class="here">${v}</a>` : `<a href="${k === 'mainnet' ? '?' : `?data=${k}`}">${v}</a>`,
+            )
+            .join(' | ')
+        $('head').innerHTML =
+          `last epoch read ${status.lastEpoch} (${utc(epochTime(status.lastEpoch))}) · ` +
+          (quarterNow ? `quarter ${quarterNow} now` : 'before activation') +
+          ` · <a href="${dir}records.jsonl">record file</a>`
+        // The network note is background, not a warning: it sits in the footer. Only warnings (the stopped reader) go on top.
+        if (NOTES[dataset]) $('netnote').innerHTML = `<p><b>About this network.</b> ${esc(NOTES[dataset])}</p>`
+        $('head').innerHTML += ` · record from ${from}`
+        // Rule: a reader that stopped must be visible. The live read below does not depend on the reader.
+        const ageMin = Math.round((Date.now() - new Date(status.lastRun)) / 60000)
+        if (LIVE.includes(dataset) && ageMin > STALE_MINUTES)
+          $('banner').innerHTML +=
+            `<div class="banner stopped">The reader has not run since ${utc(status.lastRun)} (${ageMin} minutes ago). The history below may be incomplete.</div>`
+        glanceQuarter(status, records, nowEpoch, epochTime, quarterStart)
+        glanceOrchestrators(records)
+        glanceParams(status, records, nowEpoch, epochTime, quarterStart)
+        glanceTasks(status, records, nowEpoch)
+        try {
+          const g = $('glance')
+          if (localStorage.getItem('glance') === 'closed') g.open = false
+          g.ontoggle = () => {
+            try {
+              localStorage.setItem('glance', g.open ? 'open' : 'closed')
+            } catch {}
+          }
+        } catch {}
+        liveRead(status, nowEpoch, epochTime).catch((err) => {
+          $('live').innerHTML =
+            `<div class="banner stopped">Live read of f02 failed: ${esc(err.message)}. Parts 1 and 3 show recorded values only.</div>`
+        })
 
-  // 1. queued writes: from the f02 state when the reader has it, and rebuilt from events as a cross-check
-  const fromEvents = new Map()
-  for (const r of records) {
-    if (r.source !== 'f02' || r.kind !== 'event' || !r.name.startsWith('write-')) continue
-    const key = `${r.fields.op}|${r.fields.streamId ?? ''}|${r.fields.effectiveEpoch}`
-    if (r.name === 'write-queued') fromEvents.set(key, { ...r.fields, queuedAt: r.epoch, msgCid: r.msgCid })
-    else fromEvents.delete(key)
-  }
-  const pendingFromEvents = [...fromEvents.values()].filter((w) => w.effectiveEpoch > status.lastEpoch)
-  const streamsRead = records.filter((r) => r.name === 'f02 streams' && !r.fields.error).at(-1)
-  const queue = streamsRead ? streamsRead.fields.pendingWrites.map((w) => ({ ...w, ...(fromEvents.get(slot(w)) ?? {}) })) : pendingFromEvents
-  let queueHtml = ''
-  if (streamsRead) {
-    const a = streamsRead.fields.pendingWrites.map(slot).sort().join(), b = pendingFromEvents.map(slot).sort().join()
-    if (a !== b) queueHtml += '<div class="banner">The queue read from the f02 state and the queue rebuilt from the events differ. Check both in the record file.</div>'
-  }
-  queueHtml += queue.length === 0 ? `<p>No queued writes at epoch ${status.lastEpoch}.</p>` :
-    `<div class="scroll"><table><tr><th>op</th><th>stream-id</th><th>effective epoch</th><th>time left</th><th>payload</th><th>queued</th></tr>` +
-    queue.sort((x, y) => x.effectiveEpoch - y.effectiveEpoch).map((w) => `<tr>
+        // 1. queued writes: from the f02 state when the reader has it, and rebuilt from events as a cross-check
+        const fromEvents = new Map()
+        for (const r of records) {
+          if (r.source !== 'f02' || r.kind !== 'event' || !r.name.startsWith('write-')) continue
+          const key = `${r.fields.op}|${r.fields.streamId ?? ''}|${r.fields.effectiveEpoch}`
+          if (r.name === 'write-queued') fromEvents.set(key, { ...r.fields, queuedAt: r.epoch, msgCid: r.msgCid })
+          else fromEvents.delete(key)
+        }
+        const pendingFromEvents = [...fromEvents.values()].filter((w) => w.effectiveEpoch > status.lastEpoch)
+        const streamsRead = records.filter((r) => r.name === 'f02 streams' && !r.fields.error).at(-1)
+        const queue = streamsRead
+          ? streamsRead.fields.pendingWrites.map((w) => ({ ...w, ...(fromEvents.get(slot(w)) ?? {}) }))
+          : pendingFromEvents
+        let queueHtml = ''
+        if (streamsRead) {
+          const a = streamsRead.fields.pendingWrites.map(slot).sort().join(),
+            b = pendingFromEvents.map(slot).sort().join()
+          if (a !== b)
+            queueHtml +=
+              '<div class="banner">The queue read from the f02 state and the queue rebuilt from the events differ. Check both in the record file.</div>'
+        }
+        queueHtml +=
+          queue.length === 0
+            ? `<p>No queued writes at epoch ${status.lastEpoch}.</p>`
+            : `<div class="scroll"><table><tr><th>op</th><th>stream-id</th><th>effective epoch</th><th>time left</th><th>payload</th><th>queued</th></tr>` +
+              queue
+                .sort((x, y) => x.effectiveEpoch - y.effectiveEpoch)
+                .map(
+                  (w) => `<tr>
       <td>${esc(w.op)}${w.cancellable === false ? '<br><span class="muted">cannot be cancelled</span>' : ''}</td>
       <td>${w.streamId ?? '<span class="muted">schedule-wide</span>'}</td>
       <td class="nowrap">${w.effectiveEpoch}<br><span class="muted">${utc(epochTime(w.effectiveEpoch))}</span></td>
       <td class="nowrap" data-effective="${w.effectiveEpoch}"></td>
       <td><details class="row"><summary>${summary(w.payload)}</summary><pre>${esc(JSON.stringify(w.payload, null, 2))}</pre></details></td>
-      <td class="nowrap">${w.queuedAt ? `epoch ${w.queuedAt}` : '–'}${w.msgCid ? `<br><a href="${msgLink(w.msgCid)}">message</a>` : ''}</td></tr>`).join('') + '</table></div>'
-  $('queue').innerHTML = queueHtml
-  const tick = () => document.querySelectorAll('[data-effective]').forEach((td) => { td.innerHTML = timeLeft(td.dataset.effective - nowEpoch(), status.epochSeconds) })
-  tick(); setInterval(tick, 30000)
+      <td class="nowrap">${w.queuedAt ? `epoch ${w.queuedAt}` : '–'}${w.msgCid ? `<br><a href="${msgLink(w.msgCid)}">message</a>` : ''}</td></tr>`,
+                )
+                .join('') +
+              '</table></div>'
+        $('queue').innerHTML = queueHtml
+        const tick = () =>
+          document.querySelectorAll('[data-effective]').forEach((td) => {
+            td.innerHTML = timeLeft(td.dataset.effective - nowEpoch(), status.epochSeconds)
+          })
+        tick()
+        setInterval(tick, 30000)
 
-  // 2. what landed: events, messages and claim checks, one table per quarter, newest quarter first and newest row first
-  const landedRow = (r) => `<tr>
+        // 2. what landed: events, messages and claim checks, one table per quarter, newest quarter first and newest row first
+        const landedRow = (r) => `<tr>
         <td class="nowrap">${utc(r.time)}<br><span class="muted">epoch ${r.epoch}</span></td>
         <td class="nowrap">${esc(r.source)}<br><span class="muted">${r.kind}</span></td>
         <td><details class="row"><summary><b>${esc(r.name)}</b> ${summary(r.fields)}</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>
           ${r.from ? `<span class="muted">from ${esc(r.from)}${r.via ? ` via ${esc(r.via)}` : ''}</span>` : ''}</td>
         <td class="result">${r.kind === 'message' ? (r.ok ? '<span class="ok">ok</span>' : `<span class="bad">failed</span><br>${esc(r.error ?? '')}`) : r.name === 'claim check' ? (r.fields.matches ? '<span class="ok">matches</span>' : '<span class="bad">does not match</span>') : r.kind === 'gap' ? '<span class="bad">not read</span>' : '<span class="muted">–</span>'}</td>
         <td class="nowrap">${r.tx ? `<a href="${msgLink(r.tx)}">message</a>` : r.msgCid ? `<a href="${msgLink(r.msgCid)}">message</a>` : ''}</td></tr>`
-  function renderLanded() {
-    const source = $('fSource').value, onlyBad = $('fBad').checked
-    const rows = records.filter((r) => (r.kind !== 'read' || r.name === 'claim check') && (!source || r.source === source || r.kind === 'gap') && (!onlyBad || r.ok === false))
-    const quarters = [...new Set(rows.map((r) => r.quarter))].sort((a, b) => b - a)
-    $('landed').innerHTML = rows.length === 0 ? '<p>Nothing yet.</p>' : quarters.map((q, i) => {
-      const label = q === 0 ? 'Before activation' :
-        `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` + (q === 1 ? ' · no settlement cycle (quarter 1 settles in quarter 2)' : ` · settlement cycle of quarter ${q - 1}`)
-      const body = rows.filter((r) => r.quarter === q).reverse().map(landedRow).join('')
-      return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${rows.filter((r) => r.quarter === q).length})</span></summary>
+        function renderLanded() {
+          const source = $('fSource').value,
+            onlyBad = $('fBad').checked
+          const rows = records.filter(
+            (r) =>
+              (r.kind !== 'read' || r.name === 'claim check') &&
+              (!source || r.source === source || r.kind === 'gap') &&
+              (!onlyBad || r.ok === false),
+          )
+          const quarters = [...new Set(rows.map((r) => r.quarter))].sort((a, b) => b - a)
+          $('landed').innerHTML =
+            rows.length === 0
+              ? '<p>Nothing yet.</p>'
+              : quarters
+                  .map((q, i) => {
+                    const label =
+                      q === 0
+                        ? 'Before activation'
+                        : `Quarter ${q} · ${utc(epochTime(quarterStart(q)))} to ${utc(epochTime(quarterStart(q + 1)))}` +
+                          (q === 1
+                            ? ' · no settlement cycle (quarter 1 settles in quarter 2)'
+                            : ` · settlement cycle of quarter ${q - 1}`)
+                    const body = rows
+                      .filter((r) => r.quarter === q)
+                      .reverse()
+                      .map(landedRow)
+                      .join('')
+                    return `<details class="quarter" ${i === 0 ? 'open' : ''}><summary>${label} <span class="muted">(${rows.filter((r) => r.quarter === q).length})</span></summary>
         <div class="scroll"><table><tr><th>time</th><th>source</th><th>what</th><th>result</th><th>link</th></tr>${body}</table></div></details>`
-    }).join('')
-  }
-  $('fSource').onchange = $('fBad').onchange = renderLanded
-  renderLanded()
+                  })
+                  .join('')
+        }
+        $('fSource').onchange = $('fBad').onchange = renderLanded
+        renderLanded()
 
-  // 3. state: the last value of every read
-  const last = new Map()
-  for (const r of records) if (r.kind === 'read' && r.name !== 'claim check') last.set(r.name, r)
-  $('state').innerHTML = `<div class="scroll"><table><tr><th>read</th><th>value</th><th>last changed</th></tr>` + [...last.values()].map((r) => {
-    let value = summary(r.fields)
-    if (r.name === 'f02 streams' && !r.fields.error) value = r.fields.streams.map((s) =>
-      `stream ${s.id}: weight now <b>${scaled(weightNow(s.weight, nowEpoch()), 10n ** 16n, 2)}%</b>` +
-      (s.distribution ? ` · share map: ${s.distribution.shares.map((x) => `${esc(x.recipient)} ${scaled(x.share, 10n ** 16n, 2)}%`).join(', ') || 'empty'}` : ' · IMPLICIT')).join('<br>')
-    return `<tr><td class="nowrap">${esc(r.name)}</td><td><details class="row"><summary>${value}</summary><pre>${esc(JSON.stringify(r.fields, null, 2))}</pre></details></td>
+        // 3. state: the last value of every read
+        const last = new Map()
+        for (const r of records) if (r.kind === 'read' && r.name !== 'claim check') last.set(r.name, r)
+        $('state').innerHTML =
+          `<div class="scroll"><table><tr><th>read</th><th>value</th><th>last changed</th></tr>` +
+          [...last.values()]
+            .map((r) => {
+              let value = summary(r.fields)
+              if (r.name === 'f02 streams' && !r.fields.error)
+                value = r.fields.streams
+                  .map(
+                    (s) =>
+                      `stream ${s.id}: weight now <b>${scaled(weightNow(s.weight, nowEpoch()), 10n ** 16n, 2)}%</b>` +
+                      (s.distribution
+                        ? ` · share map: ${s.distribution.shares.map((x) => `${esc(x.recipient)} ${scaled(x.share, 10n ** 16n, 2)}%`).join(', ') || 'empty'}`
+                        : ' · IMPLICIT'),
+                  )
+                  .join('<br>')
+              return `<tr><td class="nowrap">${esc(r.name)}</td><td><details class="row"><summary>${value}</summary><pre>${esc(JSON.stringify(r.fields, null, 2))}</pre></details></td>
       <td class="nowrap">${utc(r.time)}<br><span class="muted">epoch ${r.epoch}</span></td></tr>`
-  }).join('') + '</table></div>'
-}
+            })
+            .join('') +
+          '</table></div>'
+      }
 
-// Live read: the f02 state as of now, asked from the chain by this browser. Shown above the recorded values.
-async function liveRead(status, nowEpoch, epochTime) {
-  if (!LIVE.includes(dataset) || !status.rpcUrl) return
-  const rpc = async (method, params) => {
-    const body = await (await fetch(status.rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json()
-    if (body.error) throw new Error(`${method}: ${body.error.message}`)
-    return body.result
-  }
-  glanceGate(status, rpc).catch(() => {}) // the gate line is extra: a failed read leaves it out
-  const { State } = await rpc('Filecoin.StateReadState', [status.f02, null])
-  const root = Object.values(State).find((v) => v && typeof v === 'object' && '/' in v)?.['/']
-  const at = `live from the chain, f02 epoch ${State.Epoch} (${utc(epochTime(State.Epoch))})`
-  if (!root) {
-    $('live').innerHTML = `<p><b>Live:</b> ${at}. f02 on this network has no stream state yet: it still runs the code from before the upgrade, so there is no queue to read.</p>`
-    return
-  }
-  const live = decodeStreamsState(fromBase64(await rpc('Filecoin.ChainReadObj', [{ '/': root }])), status.addressPrefix)
-  const recorded = records0.filter((r) => r.name === 'f02 streams' && !r.fields.error).at(-1)
-  const differs = recorded && JSON.stringify(recorded.fields.pendingWrites.map(slot).sort()) !== JSON.stringify(live.pendingWrites.map(slot).sort())
-  footnote(live, status)
-  glanceStreams(live, nowEpoch)
-  $('live').innerHTML = `<p><b>Live:</b> ${at}. ${live.pendingWrites.length} queued write(s).` +
-    (differs ? ` <span class="bad">This differs from the recorded queue of ${utc(recorded.time)}.</span> The recorded one is older; if the difference stays after the next reader run, check both.` : '') + '</p>' +
-    (live.pendingWrites.length ? `<div class="scroll"><table><tr><th>op</th><th>stream-id</th><th>effective epoch</th><th>time left</th><th>payload</th></tr>` +
-      live.pendingWrites.map((w) => `<tr><td>${esc(w.op)}${w.cancellable ? '' : '<br><span class="muted">cannot be cancelled</span>'}</td><td>${w.streamId ?? '<span class="muted">schedule-wide</span>'}</td>
+      // Live read: the f02 state as of now, asked from the chain by this browser. Shown above the recorded values.
+      async function liveRead(status, nowEpoch, epochTime) {
+        if (!LIVE.includes(dataset) || !status.rpcUrl) return
+        const rpc = async (method, params) => {
+          const body = await (
+            await fetch(status.rpcUrl, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+            })
+          ).json()
+          if (body.error) throw new Error(`${method}: ${body.error.message}`)
+          return body.result
+        }
+        glanceGate(status, rpc).catch(() => {}) // the gate line is extra: a failed read leaves it out
+        const { State } = await rpc('Filecoin.StateReadState', [status.f02, null])
+        const root = Object.values(State).find((v) => v && typeof v === 'object' && '/' in v)?.['/']
+        const at = `live from the chain, f02 epoch ${State.Epoch} (${utc(epochTime(State.Epoch))})`
+        if (!root) {
+          $('live').innerHTML =
+            `<p><b>Live:</b> ${at}. f02 on this network has no stream state yet: it still runs the code from before the upgrade, so there is no queue to read.</p>`
+          return
+        }
+        const live = decodeStreamsState(
+          fromBase64(await rpc('Filecoin.ChainReadObj', [{ '/': root }])),
+          status.addressPrefix,
+        )
+        const recorded = records0.filter((r) => r.name === 'f02 streams' && !r.fields.error).at(-1)
+        const differs =
+          recorded &&
+          JSON.stringify(recorded.fields.pendingWrites.map(slot).sort()) !==
+            JSON.stringify(live.pendingWrites.map(slot).sort())
+        footnote(live, status)
+        glanceStreams(live, nowEpoch)
+        $('live').innerHTML =
+          `<p><b>Live:</b> ${at}. ${live.pendingWrites.length} queued write(s).` +
+          (differs
+            ? ` <span class="bad">This differs from the recorded queue of ${utc(recorded.time)}.</span> The recorded one is older; if the difference stays after the next reader run, check both.`
+            : '') +
+          '</p>' +
+          (live.pendingWrites.length
+            ? `<div class="scroll"><table><tr><th>op</th><th>stream-id</th><th>effective epoch</th><th>time left</th><th>payload</th></tr>` +
+              live.pendingWrites
+                .map(
+                  (
+                    w,
+                  ) => `<tr><td>${esc(w.op)}${w.cancellable ? '' : '<br><span class="muted">cannot be cancelled</span>'}</td><td>${w.streamId ?? '<span class="muted">schedule-wide</span>'}</td>
         <td class="nowrap">${w.effectiveEpoch}<br><span class="muted">${utc(epochTime(w.effectiveEpoch))}</span></td><td class="nowrap" data-effective="${w.effectiveEpoch}">${timeLeft(w.effectiveEpoch - nowEpoch(), status.epochSeconds)}</td>
-        <td><details class="row"><summary>${summary(w.payload)}</summary><pre>${esc(JSON.stringify(w.payload, null, 2))}</pre></details></td></tr>`).join('') + '</table></div>' : '') // weights now: in the At a glance block
-}
-let records0 = []
+        <td><details class="row"><summary>${summary(w.payload)}</summary><pre>${esc(JSON.stringify(w.payload, null, 2))}</pre></details></td></tr>`,
+                )
+                .join('') +
+              '</table></div>'
+            : '') // weights now: in the At a glance block
+      }
+      let records0 = []
 
-// At a glance, row 1: streams and weights (live f02 read), Orchestrators and their registered pairs (replayed from the
-// SRA events of this record: admitted minus removed; pairs declared or reassigned minus cancelled, counted per
-// Orchestrator that is still admitted).
-let glanceOrch = ''
-function glanceOrchestrators(records) {
-  const admitted = new Set(), pairOf = new Map()
-  for (const r of records) {
-    if (r.kind !== 'event' || r.source !== 'SRA') continue
-    const f = r.fields
-    if (r.name === 'OrchestratorAdmitted') admitted.add(f.orch)
-    if (r.name === 'OrchestratorRemoved') admitted.delete(f.orch)
-    if (r.name === 'BindingDeclared' || r.name === 'BindingReassigned') pairOf.set(`${f.payer}|${f.operator}`, f.orchestrator)
-    if (r.name === 'BindingCanceled') pairOf.delete(`${f.payer}|${f.operator}`)
-  }
-  const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
-  const counts = [...admitted].map((o) => { const n = [...pairOf.values()].filter((x) => x === o).length; return `${short(o)}: ${n} ${n === 1 ? 'pair' : 'pairs'}` })
-  glanceOrch = `<b>Orchestrators:</b> ${admitted.size}${counts.length ? ' · ' + counts.join(' · ') : ''}`
-  if (!$('glanceStreams').dataset.live) $('glanceStreams').innerHTML = glanceOrch
-}
-function glanceStreams(live, nowEpoch) {
-  const kinds = live.streams.map((st) => `stream ${st.id}${st.distribution ? ' (service)' : ' (consensus)'} ${scaled(weightNow(st.weight, nowEpoch()), 10n ** 16n, 2)}%`)
-  $('glanceStreams').dataset.live = '1'
-  $('glanceStreams').innerHTML = `<b>Streams:</b> ${live.streams.length} · ${kinds.join(' · ')}<br>${glanceOrch}`
-}
+      // At a glance, row 1: streams and weights (live f02 read), Orchestrators and their registered pairs (replayed from the
+      // SRA events of this record: admitted minus removed; pairs declared or reassigned minus cancelled, counted per
+      // Orchestrator that is still admitted).
+      let glanceOrch = ''
+      function glanceOrchestrators(records) {
+        const admitted = new Set(),
+          pairOf = new Map()
+        for (const r of records) {
+          if (r.kind !== 'event' || r.source !== 'SRA') continue
+          const f = r.fields
+          if (r.name === 'OrchestratorAdmitted') admitted.add(f.orch)
+          if (r.name === 'OrchestratorRemoved') admitted.delete(f.orch)
+          if (r.name === 'BindingDeclared' || r.name === 'BindingReassigned')
+            pairOf.set(`${f.payer}|${f.operator}`, f.orchestrator)
+          if (r.name === 'BindingCanceled') pairOf.delete(`${f.payer}|${f.operator}`)
+        }
+        const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
+        const counts = [...admitted].map((o) => {
+          const n = [...pairOf.values()].filter((x) => x === o).length
+          return `${short(o)}: ${n} ${n === 1 ? 'pair' : 'pairs'}`
+        })
+        glanceOrch = `<b>Orchestrators:</b> ${admitted.size}${counts.length ? ' · ' + counts.join(' · ') : ''}`
+        if (!$('glanceStreams').dataset.live) $('glanceStreams').innerHTML = glanceOrch
+      }
+      function glanceStreams(live, nowEpoch) {
+        const kinds = live.streams.map(
+          (st) =>
+            `stream ${st.id}${st.distribution ? ' (service)' : ' (consensus)'} ${scaled(weightNow(st.weight, nowEpoch()), 10n ** 16n, 2)}%`,
+        )
+        $('glanceStreams').dataset.live = '1'
+        $('glanceStreams').innerHTML = `<b>Streams:</b> ${live.streams.length} · ${kinds.join(' · ')}<br>${glanceOrch}`
+      }
 
-// At a glance, row 2: where the chain is in the current quarter Q. The cycle of quarter Q-1 runs inside quarter Q
-// (SRA: "Quarter anchor E = FIP-0118 Start(q+1), where quarter q's cycle opens"): POST_PERIOD, then VERIFICATION_WINDOW,
-// then the value binds and SubmitShares and the gate check can run. The last REGISTRATION_CUTOFF epochs before
-// Start(Q+1) are marked: a pair registered there applies only from Start(Q+1) and covers nothing of quarter Q. The cutoff in force is the last
-// PricingParamsUpdated before Start(Q) (a parameter applies from the next quarter's first epoch).
-function glanceQuarter(status, records, nowEpoch, epochTime, quarterStart) {
-  const now = nowEpoch(), A = status.activationEpoch, L = status.epochsPerQuarter
-  if (!A || now < A) { $('glanceQuarter').innerHTML = `<div class="glance-row"><b>Quarter:</b> before activation (activation epoch ${A || 'not chosen'})</div>`; return }
-  const Q = Math.floor((now - A) / L) + 1, s = quarterStart(Q), e = quarterStart(Q + 1)
-  const P = status.postPeriod, V = status.verificationWindow
-  const priced = records.filter((r) => r.kind === 'event' && r.name === 'PricingParamsUpdated' && r.epoch < s).at(-1)
-  const cutoff = priced ? Number(priced.fields.registrationCutoff) : 0
-  const pct = (x) => (100 * x / L).toFixed(2) + '%'
-  // The bar carries only colours; the phase list under it gives each phase with its times (readable on a phone).
-  const seg = (cls, len, label) => len > 0 ? `<div class="${cls}" style="width:${pct(len)}" title="${label}"></div>` : ''
-  // Quarters of a day or more cross midnight: then each time carries its day ("Mon 28 13:00").
-  const hhmm = (x) => { const d = new Date(epochTime(x)); const t = d.toISOString().slice(11, 16); return L * status.epochSeconds >= 86400 ? `${d.toUTCString().slice(0, 3)} ${d.getUTCDate()} ${t}` : t }
-  const phases = []
-  const phaseRow = (cls, from, to, label) => phases.push(`<li class="${now >= from && now < to ? 'here' : ''}"><span class="dot ${cls}"></span>${hhmm(from)} to ${hhmm(to)} UTC · ${label}${now >= from && now < to ? ' (now)' : ''}</li>`)
-  let segs
-  if (Q === 1) { segs = seg('seg-none', L - cutoff, 'no cycle in Q1'); phaseRow('seg-none', s, e - cutoff, 'no posting cycle in Q1 (Q1 posts in Q2)') }
-  else if (!P || !V) { segs = seg('seg-none', L - cutoff, `cycle of Q${Q - 1}`); phaseRow('seg-none', s, e - cutoff, `cycle of Q${Q - 1} (windows known after the next reader run)`) }
-  else {
-    segs = seg('seg-post', P, `POST_PERIOD Q${Q - 1}`) + seg('seg-verify', V, `VERIFICATION_WINDOW Q${Q - 1}`) + seg('seg-bound', L - P - V - cutoff, `Q${Q - 1} bound`)
-    phaseRow('seg-post', s, s + P, `POST_PERIOD for Q${Q - 1}`)
-    phaseRow('seg-verify', s + P, s + P + V, `VERIFICATION_WINDOW for Q${Q - 1}`)
-    phaseRow('seg-bound', s + P + V, e - cutoff, `Q${Q - 1} bound: submitShares(${Q - 1}) and gate check`)
-  }
-  segs += seg('seg-cut', cutoff, 'REGISTRATION_CUTOFF')
-  if (cutoff) phaseRow('seg-cut', e - cutoff, e, `REGISTRATION_CUTOFF (${cutoff} epochs): a pair registered here applies from Q${Q + 1}`)
-  const phase = Q === 1 ? 'bootstrap, no posting cycle' : !P || !V ? '' : now < s + P ? `POST_PERIOD for Q${Q - 1} until ${utc(epochTime(s + P))}` : now < s + P + V ? `VERIFICATION_WINDOW for Q${Q - 1} until ${utc(epochTime(s + P + V))}` : `Q${Q - 1} bound at ${utc(epochTime(s + P + V))}: submitShares(${Q - 1}) and gate check open`
-  // FIP-0118 §2.2: a registration applies from its execution epoch (back-cover to the quarter's first epoch); one made in
-  // [Start(Q+1) - REGISTRATION_CUTOFF, Start(Q+1)) applies from Start(Q+1) and covers nothing of quarter Q.
-  const inCut = cutoff && now >= e - cutoff ? ` · inside REGISTRATION_CUTOFF: a pair registered now applies from ${utc(epochTime(e))} and covers nothing of Q${Q}` : ''
-  $('glanceQuarter').innerHTML = `<div class="glance-row"><b>Quarter:</b> Q${Q} · ${phase}${inCut}</div>` +
-    `<div class="bar">${segs}<div class="now" style="left:${pct(now - s)}" title="now, epoch ${now}"></div></div>` +
-    `<ul class="phases">${phases.join('')}</ul><div class="muted" style="font-size:12px">Q${Q}: ${utc(epochTime(s))} to ${utc(epochTime(e))}${cutoff ? '' : ' · REGISTRATION_CUTOFF not set'}</div>`
-}
+      // At a glance, row 2: where the chain is in the current quarter Q. The cycle of quarter Q-1 runs inside quarter Q
+      // (SRA: "Quarter anchor E = FIP-0118 Start(q+1), where quarter q's cycle opens"): POST_PERIOD, then VERIFICATION_WINDOW,
+      // then the value binds and SubmitShares and the gate check can run. The last REGISTRATION_CUTOFF epochs before
+      // Start(Q+1) are marked: a pair registered there applies only from Start(Q+1) and covers nothing of quarter Q. The cutoff in force is the last
+      // PricingParamsUpdated before Start(Q) (a parameter applies from the next quarter's first epoch).
+      function glanceQuarter(status, records, nowEpoch, epochTime, quarterStart) {
+        const now = nowEpoch(),
+          A = status.activationEpoch,
+          L = status.epochsPerQuarter
+        if (!A || now < A) {
+          $('glanceQuarter').innerHTML =
+            `<div class="glance-row"><b>Quarter:</b> before activation (activation epoch ${A || 'not chosen'})</div>`
+          return
+        }
+        const Q = Math.floor((now - A) / L) + 1,
+          s = quarterStart(Q),
+          e = quarterStart(Q + 1)
+        const P = status.postPeriod,
+          V = status.verificationWindow
+        const priced = records
+          .filter((r) => r.kind === 'event' && r.name === 'PricingParamsUpdated' && r.epoch < s)
+          .at(-1)
+        const cutoff = priced ? Number(priced.fields.registrationCutoff) : 0
+        const pct = (x) => ((100 * x) / L).toFixed(2) + '%'
+        // The bar carries only colours; the phase list under it gives each phase with its times (readable on a phone).
+        const seg = (cls, len, label) =>
+          len > 0 ? `<div class="${cls}" style="width:${pct(len)}" title="${label}"></div>` : ''
+        // Quarters of a day or more cross midnight: then each time carries its day ("Mon 28 13:00").
+        const hhmm = (x) => {
+          const d = new Date(epochTime(x))
+          const t = d.toISOString().slice(11, 16)
+          return L * status.epochSeconds >= 86400 ? `${d.toUTCString().slice(0, 3)} ${d.getUTCDate()} ${t}` : t
+        }
+        const phases = []
+        const phaseRow = (cls, from, to, label) =>
+          phases.push(
+            `<li class="${now >= from && now < to ? 'here' : ''}"><span class="dot ${cls}"></span>${hhmm(from)} to ${hhmm(to)} UTC · ${label}${now >= from && now < to ? ' (now)' : ''}</li>`,
+          )
+        let segs
+        if (Q === 1) {
+          segs = seg('seg-none', L - cutoff, 'no cycle in Q1')
+          phaseRow('seg-none', s, e - cutoff, 'no posting cycle in Q1 (Q1 posts in Q2)')
+        } else if (!P || !V) {
+          segs = seg('seg-none', L - cutoff, `cycle of Q${Q - 1}`)
+          phaseRow('seg-none', s, e - cutoff, `cycle of Q${Q - 1} (windows known after the next reader run)`)
+        } else {
+          segs =
+            seg('seg-post', P, `POST_PERIOD Q${Q - 1}`) +
+            seg('seg-verify', V, `VERIFICATION_WINDOW Q${Q - 1}`) +
+            seg('seg-bound', L - P - V - cutoff, `Q${Q - 1} bound`)
+          phaseRow('seg-post', s, s + P, `POST_PERIOD for Q${Q - 1}`)
+          phaseRow('seg-verify', s + P, s + P + V, `VERIFICATION_WINDOW for Q${Q - 1}`)
+          phaseRow('seg-bound', s + P + V, e - cutoff, `Q${Q - 1} bound: submitShares(${Q - 1}) and gate check`)
+        }
+        segs += seg('seg-cut', cutoff, 'REGISTRATION_CUTOFF')
+        if (cutoff)
+          phaseRow(
+            'seg-cut',
+            e - cutoff,
+            e,
+            `REGISTRATION_CUTOFF (${cutoff} epochs): a pair registered here applies from Q${Q + 1}`,
+          )
+        const phase =
+          Q === 1
+            ? 'bootstrap, no posting cycle'
+            : !P || !V
+              ? ''
+              : now < s + P
+                ? `POST_PERIOD for Q${Q - 1} until ${utc(epochTime(s + P))}`
+                : now < s + P + V
+                  ? `VERIFICATION_WINDOW for Q${Q - 1} until ${utc(epochTime(s + P + V))}`
+                  : `Q${Q - 1} bound at ${utc(epochTime(s + P + V))}: submitShares(${Q - 1}) and gate check open`
+        // FIP-0118 §2.2: a registration applies from its execution epoch (back-cover to the quarter's first epoch); one made in
+        // [Start(Q+1) - REGISTRATION_CUTOFF, Start(Q+1)) applies from Start(Q+1) and covers nothing of quarter Q.
+        const inCut =
+          cutoff && now >= e - cutoff
+            ? ` · inside REGISTRATION_CUTOFF: a pair registered now applies from ${utc(epochTime(e))} and covers nothing of Q${Q}`
+            : ''
+        $('glanceQuarter').innerHTML =
+          `<div class="glance-row"><b>Quarter:</b> Q${Q} · ${phase}${inCut}</div>` +
+          `<div class="bar">${segs}<div class="now" style="left:${pct(now - s)}" title="now, epoch ${now}"></div></div>` +
+          `<ul class="phases">${phases.join('')}</ul><div class="muted" style="font-size:12px">Q${Q}: ${utc(epochTime(s))} to ${utc(epochTime(e))}${cutoff ? '' : ' · REGISTRATION_CUTOFF not set'}</div>`
+      }
 
-// At a glance, the gate line: what the next QuarterlyGateCheck will compare. The SWA has no getter for its gate
-// state, so this reads the four storage slots of GateParamsInfo (solstice src/lib/GateParams.sol: GATE_PARAMS_SLOT,
-// then lastCheckedQuarter, target.base, target.stepRatio, steps). The check reads quarter lastCheckedQuarter + 1 and
-// passes when AggregatedFPV >= base * stepRatio^steps (nextThreshold). Posted values come from this record.
-const GATE_PARAMS_SLOT = 0xf9abab00248d945495524c8caf6be2b837274c1becd1964fb3775f62fd6e4600n, GATE_STEPS = 8n
-async function glanceGate(status, rpc) {
-  if (!status.swa || !status.activationEpoch) return
-  const [last, base, ratio, steps] = await Promise.all([0n, 1n, 2n, 3n].map(async (i) => BigInt(await rpc('eth_getStorageAt', [status.swa, '0x' + (GATE_PARAMS_SLOT + i).toString(16), 'latest']))))
-  if (!base) return // contract not initialised on this network
-  let target = base; for (let i = 0n; i < steps; i++) target = target * ratio / E18
-  const usd = (v) => { const n = BigInt(v); return n > 0n && n < E18 / 100n ? `${n} raw (under 0.01 USD)` : scaled(n, E18, 2) + ' USD' }
-  const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
-  const q = last + 1n, posted = new Map()
-  for (const r of records0) if (r.kind === 'event' && (r.name === 'VolumePosted' || r.name === 'VolumeCorrected') && BigInt(r.fields.q) === q) posted.set(r.fields.orchestrator, usd(r.fields.volume) + (r.name === 'VolumeCorrected' ? ' (corrected)' : ''))
-  const bound = records0.filter((r) => r.name === `SRA aggregatedFilecoinPayVolume(${q})` && r.fields.usd !== undefined).at(-1)
-  const lastCheck = records0.filter((r) => r.kind === 'event' && r.name === 'QuarterlyGateCheckResult').at(-1)
-  const parts = steps >= GATE_STEPS ? [`all ${GATE_STEPS} steps done, no more checks`] : [
-    `next check reads Q${q}`, `target ${usd(target)} (steps ${steps} of ${GATE_STEPS})`,
-    `posted for Q${q}: ${posted.size ? [...posted].map(([o, v]) => `${short(o)} ${v}`).join(', ') : 'none yet'}`,
-    bound ? `Q${q} bound: ${usd(bound.fields.usd)}, ${BigInt(bound.fields.usd) >= target ? 'at or above' : 'below'} the target` : `Q${q} not bound yet`]
-  if (lastCheck) parts.push(`last check: Q${lastCheck.fields.quarter} ${lastCheck.fields.passed ? 'passed' : 'failed'}`)
-  $('glanceGate').innerHTML = `<div class="glance-row"><b>Gate:</b> ${parts.join(' · ')}</div>`
-  const cell = $('gateParamsCell'); if (cell) cell.textContent = `target.base ${scaled(base, E18, 2)} USD · target.stepRatio ${scaled(ratio, E18, 2)} · steps ${steps} (as set at deployment, read live from the SWA)`
-}
+      // At a glance, the gate line: what the next QuarterlyGateCheck will compare. The SWA has no getter for its gate
+      // state, so this reads the four storage slots of GateParamsInfo (solstice src/lib/GateParams.sol: GATE_PARAMS_SLOT,
+      // then lastCheckedQuarter, target.base, target.stepRatio, steps). The check reads quarter lastCheckedQuarter + 1 and
+      // passes when AggregatedFPV >= base * stepRatio^steps (nextThreshold). Posted values come from this record.
+      const GATE_PARAMS_SLOT = 0xf9abab00248d945495524c8caf6be2b837274c1becd1964fb3775f62fd6e4600n,
+        GATE_STEPS = 8n
+      async function glanceGate(status, rpc) {
+        if (!status.swa || !status.activationEpoch) return
+        const [last, base, ratio, steps] = await Promise.all(
+          [0n, 1n, 2n, 3n].map(async (i) =>
+            BigInt(await rpc('eth_getStorageAt', [status.swa, '0x' + (GATE_PARAMS_SLOT + i).toString(16), 'latest'])),
+          ),
+        )
+        if (!base) return // contract not initialised on this network
+        let target = base
+        for (let i = 0n; i < steps; i++) target = (target * ratio) / E18
+        const usd = (v) => {
+          const n = BigInt(v)
+          return n > 0n && n < E18 / 100n ? `${n} raw (under 0.01 USD)` : scaled(n, E18, 2) + ' USD'
+        }
+        const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
+        const q = last + 1n,
+          posted = new Map()
+        for (const r of records0)
+          if (
+            r.kind === 'event' &&
+            (r.name === 'VolumePosted' || r.name === 'VolumeCorrected') &&
+            BigInt(r.fields.q) === q
+          )
+            posted.set(
+              r.fields.orchestrator,
+              usd(r.fields.volume) + (r.name === 'VolumeCorrected' ? ' (corrected)' : ''),
+            )
+        const bound = records0
+          .filter((r) => r.name === `SRA aggregatedFilecoinPayVolume(${q})` && r.fields.usd !== undefined)
+          .at(-1)
+        const lastCheck = records0.filter((r) => r.kind === 'event' && r.name === 'QuarterlyGateCheckResult').at(-1)
+        const parts =
+          steps >= GATE_STEPS
+            ? [`all ${GATE_STEPS} steps done, no more checks`]
+            : [
+                `next check reads Q${q}`,
+                `target ${usd(target)} (steps ${steps} of ${GATE_STEPS})`,
+                `posted for Q${q}: ${posted.size ? [...posted].map(([o, v]) => `${short(o)} ${v}`).join(', ') : 'none yet'}`,
+                bound
+                  ? `Q${q} bound: ${usd(bound.fields.usd)}, ${BigInt(bound.fields.usd) >= target ? 'at or above' : 'below'} the target`
+                  : `Q${q} not bound yet`,
+              ]
+        if (lastCheck)
+          parts.push(`last check: Q${lastCheck.fields.quarter} ${lastCheck.fields.passed ? 'passed' : 'failed'}`)
+        $('glanceGate').innerHTML = `<div class="glance-row"><b>Gate:</b> ${parts.join(' · ')}</div>`
+        const cell = $('gateParamsCell')
+        if (cell)
+          cell.textContent = `target.base ${scaled(base, E18, 2)} USD · target.stepRatio ${scaled(ratio, E18, 2)} · steps ${steps} (as set at deployment, read live from the SWA)`
+      }
 
-// At a glance, the open governance tasks (rvagg's ask, 2026-10-08): a Safe proposal that got one approval and was
-// never executed or vetoed stays in the contract, and its approval still counts later (Owners.sol: a removed owner's
-// bit "recycles to a future owner carrying the old approvals"). Built from this record: a task opens on Submitted,
-// closes on a second Approved (executed, or held for an upgrade / SetGateParams) or on Rejected. A confirming call
-// that reverted left no Approved event, so its task stays open here as it does on chain. The contract's task storage
-// itself is not read.
-function glanceTasks(status, records, nowEpoch) {
-  const tasks = new Map(), calls = new Map(), owners = { SRA: new Set(), SWA: new Set() }
-  for (const r of records) if (r.kind === 'message' && r.tx) calls.set(r.source + r.tx, r)
-  for (const r of records) {
-    if (r.kind !== 'event') continue
-    if (r.name === 'OwnerAdded') owners[r.source]?.add(r.fields.owner.toLowerCase())
-    if (r.name === 'OwnerRemoved') owners[r.source]?.delete(r.fields.owner.toLowerCase())
-    if (!['Submitted', 'Approved', 'Rejected'].includes(r.name)) continue
-    const k = r.source + r.fields.taskId
-    if (r.name === 'Submitted' || !tasks.has(k)) tasks.set(k, { source: r.source, taskId: r.fields.taskId, epoch: r.epoch, time: r.time, call: calls.get(r.source + r.tx), approvals: [], open: true })
-    const t = tasks.get(k)
-    if (r.name === 'Approved') { t.approvals.push({ owner: r.fields.owner, time: r.time }); if (t.approvals.length >= 2) t.open = false }
-    if (r.name === 'Rejected') t.open = false
-  }
-  const open = [...tasks.values()].filter((t) => t.open).sort((a, b) => a.epoch - b.epoch)
-  const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
-  const days = (e) => ((nowEpoch() - e) * status.epochSeconds / 86400).toFixed(1)
-  const rows = open.map((t) => {
-    const stale = t.approvals.filter((a) => !owners[t.source].has(a.owner.toLowerCase()))
-    const warn = Number(days(t.epoch)) > 7 || stale.length
-    return `<tr><td>${warn ? '⚠ ' : ''}${t.source}</td><td>${t.call ? `<b>${esc(t.call.name)}</b> ${summary(t.call.fields)}` : `task ${short(t.taskId)}`}</td>` +
-      `<td>${t.call?.via ? esc(t.call.via) : t.call?.from ? short(t.call.from) : '–'}</td>` +
-      `<td class="nowrap">${t.approvals.map((a) => `${short(a.owner)} ${utc(a.time)}${owners[t.source].has(a.owner.toLowerCase()) ? '' : ' (no longer an owner)'}`).join('<br>') || 'none'}</td>` +
-      `<td class="nowrap">${days(t.epoch)} days${t.call?.tx ? `<br><a href="${msgLink(t.call.tx)}">message</a>` : ''}</td></tr>`
-  })
-  $('glanceTasks').innerHTML = `<details class="row fold"><summary><b>Pending governance tasks:</b> ${open.length}${open.some((t) => Number(days(t.epoch)) > 7 || t.approvals.some((a) => !owners[t.source].has(a.owner.toLowerCase()))) ? ' ⚠' : ''}</summary>` +
-    `<div class="muted" style="font-size:12px">Proposals with one approval, not executed and not vetoed, as this record sees them. ⚠ = older than 7 days, or approved by a Safe that is no longer an owner (its approval still counts, see Owners.sol). A task whose second approval starts a hold (upgrade, SetGateParams) is counted as closed.</div>` +
-    (rows.length ? `<div class="scroll"><table class="params"><tr><td>Contract</td><td>Proposal</td><td>Proposed via</td><td>Approvals</td><td>Age</td></tr>${rows.join('')}</table></div>` : '') + '</details>'
-}
+      // At a glance, the open governance tasks (rvagg's ask, 2026-10-08): a Safe proposal that got one approval and was
+      // never executed or vetoed stays in the contract, and its approval still counts later (Owners.sol: a removed owner's
+      // bit "recycles to a future owner carrying the old approvals"). Built from this record: a task opens on Submitted,
+      // closes on a second Approved (executed, or held for an upgrade / SetGateParams) or on Rejected. A confirming call
+      // that reverted left no Approved event, so its task stays open here as it does on chain. The contract's task storage
+      // itself is not read.
+      function glanceTasks(status, records, nowEpoch) {
+        const tasks = new Map(),
+          calls = new Map(),
+          owners = { SRA: new Set(), SWA: new Set() }
+        for (const r of records) if (r.kind === 'message' && r.tx) calls.set(r.source + r.tx, r)
+        for (const r of records) {
+          if (r.kind !== 'event') continue
+          if (r.name === 'OwnerAdded') owners[r.source]?.add(r.fields.owner.toLowerCase())
+          if (r.name === 'OwnerRemoved') owners[r.source]?.delete(r.fields.owner.toLowerCase())
+          if (!['Submitted', 'Approved', 'Rejected'].includes(r.name)) continue
+          const k = r.source + r.fields.taskId
+          if (r.name === 'Submitted' || !tasks.has(k))
+            tasks.set(k, {
+              source: r.source,
+              taskId: r.fields.taskId,
+              epoch: r.epoch,
+              time: r.time,
+              call: calls.get(r.source + r.tx),
+              approvals: [],
+              open: true,
+            })
+          const t = tasks.get(k)
+          if (r.name === 'Approved') {
+            t.approvals.push({ owner: r.fields.owner, time: r.time })
+            if (t.approvals.length >= 2) t.open = false
+          }
+          if (r.name === 'Rejected') t.open = false
+        }
+        const open = [...tasks.values()].filter((t) => t.open).sort((a, b) => a.epoch - b.epoch)
+        const short = (a) => a.slice(0, 6) + '…' + a.slice(-4)
+        const days = (e) => (((nowEpoch() - e) * status.epochSeconds) / 86400).toFixed(1)
+        const rows = open.map((t) => {
+          const stale = t.approvals.filter((a) => !owners[t.source].has(a.owner.toLowerCase()))
+          const warn = Number(days(t.epoch)) > 7 || stale.length
+          return (
+            `<tr><td>${warn ? '⚠ ' : ''}${t.source}</td><td>${t.call ? `<b>${esc(t.call.name)}</b> ${summary(t.call.fields)}` : `task ${short(t.taskId)}`}</td>` +
+            `<td>${t.call?.via ? esc(t.call.via) : t.call?.from ? short(t.call.from) : '–'}</td>` +
+            `<td class="nowrap">${t.approvals.map((a) => `${short(a.owner)} ${utc(a.time)}${owners[t.source].has(a.owner.toLowerCase()) ? '' : ' (no longer an owner)'}`).join('<br>') || 'none'}</td>` +
+            `<td class="nowrap">${days(t.epoch)} days${t.call?.tx ? `<br><a href="${msgLink(t.call.tx)}">message</a>` : ''}</td></tr>`
+          )
+        })
+        $('glanceTasks').innerHTML =
+          `<details class="row fold"><summary><b>Pending governance tasks:</b> ${open.length}${open.some((t) => Number(days(t.epoch)) > 7 || t.approvals.some((a) => !owners[t.source].has(a.owner.toLowerCase()))) ? ' ⚠' : ''}</summary>` +
+          `<div class="muted" style="font-size:12px">Proposals with one approval, not executed and not vetoed, as this record sees them. ⚠ = older than 7 days, or approved by a Safe that is no longer an owner (its approval still counts, see Owners.sol). A task whose second approval starts a hold (upgrade, SetGateParams) is counted as closed.</div>` +
+          (rows.length
+            ? `<div class="scroll"><table class="params"><tr><td>Contract</td><td>Proposal</td><td>Proposed via</td><td>Approvals</td><td>Age</td></tr>${rows.join('')}</table></div>`
+            : '') +
+          '</details>'
+      }
 
-// At a glance, part 3: the parameters in force. Governance parameters come from the SRA and SWA events of this record;
-// the admitted lists and the pricing parameters apply from the first epoch of the next quarter (FIP-0118 §2.2), so the
-// value in force in quarter Q is the last event before Start(Q), and a later one is shown as pending. GateParamsSet is
-// emitted when the change takes effect. The per-network constants come from deployments.json (via the config).
-// Token labels: synapse-sdk chains.ts / generated.ts and the Filecoin Pay explorer's payment-tokens.ts.
-const KNOWN = {
-  calibnet: { '0xb3042734b608a1b16e9e86b374a3f3e389b4cdf0': 'USDFC', '0xeb466342c4d449bc9f53a865d5cb90586f405215': 'axlUSDC mainnet address, no contract on calibnet', '0x09a0fdc2723fad1a7b8e3e00ee5df73841df55a0': 'Filecoin Pay' },
-  mainnet: { '0x80b98d3aa09ffff255c3ba4a241111ff1262f045': 'USDFC', '0xeb466342c4d449bc9f53a865d5cb90586f405215': 'axlUSDC', '0x23b1e018f08bb982348b15a86ee926eebf7f4daa': 'Filecoin Pay' },
-}
-function glanceParams(status, records, nowEpoch, epochTime, quarterStart) {
-  const now = nowEpoch(), A = status.activationEpoch, L = status.epochsPerQuarter, sec = status.epochSeconds
-  const active = A && now >= A, Q = active ? Math.floor((now - A) / L) + 1 : 0
-  const boundary = active ? quarterStart(Q) : Infinity // before activation every event applies from Q1
-  const label = (a) => { const k = (KNOWN[status.network] ?? {})[a.toLowerCase()]; return `<code>${a.slice(0, 6)}…${a.slice(-4)}</code>${k ? ' ' + k : ''}` }
-  const hours = (n) => { const h = n * sec / 3600, d = +(h / 24).toFixed(2); return h >= 24 ? `${d} ${d === 1 ? 'day' : 'days'}` : `${+h.toFixed(2)} h` }
-  const pick = (name) => { const ev = records.filter((r) => r.kind === 'event' && r.name === name); return { cur: ev.filter((r) => r.epoch < boundary).at(-1), next: ev.filter((r) => r.epoch >= boundary).at(-1) } }
-  const since = (r, fromNext) => !r ? '' : active ? (fromNext ? `pending: applies from ${utc(epochTime(quarterStart(Q + 1)))}` : `since ${utc(r.time)}`) : `set ${utc(r.time)}, applies from Q1`
-  const rows = []
-  const row = (name, value, when) => rows.push(`<tr><td>${name}</td><td>${value}</td><td class="muted">${when}</td></tr>`)
-  const lists = pick('AdmittedListsUpdated'), price = pick('PricingParamsUpdated'), gate = records.filter((r) => r.kind === 'event' && r.name === 'GateParamsSet').at(-1)
-  for (const [which, key] of [['cur', false], ['next', true]]) {
-    const l = lists[which], p = price[which]
-    if (l) { row('Admitted stablecoins', l.fields.stablecoins.map(label).join('<br>'), since(l, key)); row('Admitted Filecoin Pay contracts', l.fields.filecoinPayContracts.map(label).join('<br>'), since(l, key)) }
-    if (p) {
-      const f = p.fields
-      row('MIN_LOT_FLOOR', scaled(f.minLotFloor, E18, 2) + ' USD', since(p, key))
-      row('MIN_LOT_ALPHA', `${f.minLotAlphaNum}/${f.minLotAlphaDen}`, since(p, key))
-      row('PRICE_BAND', `${f.priceBand} basis points = ${Number(f.priceBand) / 100}%`, since(p, key))
-      row('REGISTRATION_CUTOFF', `${f.registrationCutoff} epochs = ${hours(Number(f.registrationCutoff))}`, since(p, key))
-    }
-  }
-  if (!lists.cur && !lists.next) row('Admitted lists', 'none set', '')
-  if (!price.cur && !price.next) row('Pricing parameters', 'none set', '')
-  if (gate) { const g = gate.fields.params; row('Gate parameters', `target.base ${scaled(g.target.base, E18, 2)} USD · target.stepRatio ${scaled(g.target.stepRatio, E18, 2)} · steps ${g.steps}`, `since ${utc(gate.time)}`) }
-  else row('Gate parameters', '<span id="gateParamsCell">as set at deployment (no GateParamsSet event yet)</span>', '')
-  row('EPOCHS_PER_QUARTER', `${L} = ${hours(L)}`, 'deployments.json')
-  if (status.postPeriod) row('POST_PERIOD', `${status.postPeriod} epochs = ${hours(status.postPeriod)}`, 'deployments.json')
-  if (status.verificationWindow) row('VERIFICATION_WINDOW', `${status.verificationWindow} epochs = ${hours(status.verificationWindow)}`, 'deployments.json')
-  if (status.swaTimelockEpochs) row('SWA_TIMELOCK', `${status.swaTimelockEpochs} epochs = ${hours(status.swaTimelockEpochs)}`, 'f02 state (Lotus params)')
-  $('glanceParams').innerHTML = `<details class="row fold"><summary><b>Parameters in force</b></summary><div class="scroll"><table class="params">${rows.join('')}</table></div></details>`
-}
+      // At a glance, part 3: the parameters in force. Governance parameters come from the SRA and SWA events of this record;
+      // the admitted lists and the pricing parameters apply from the first epoch of the next quarter (FIP-0118 §2.2), so the
+      // value in force in quarter Q is the last event before Start(Q), and a later one is shown as pending. GateParamsSet is
+      // emitted when the change takes effect. The per-network constants come from deployments.json (via the config).
+      // Token labels: synapse-sdk chains.ts / generated.ts and the Filecoin Pay explorer's payment-tokens.ts.
+      const KNOWN = {
+        calibnet: {
+          '0xb3042734b608a1b16e9e86b374a3f3e389b4cdf0': 'USDFC',
+          '0xeb466342c4d449bc9f53a865d5cb90586f405215': 'axlUSDC mainnet address, no contract on calibnet',
+          '0x09a0fdc2723fad1a7b8e3e00ee5df73841df55a0': 'Filecoin Pay',
+        },
+        mainnet: {
+          '0x80b98d3aa09ffff255c3ba4a241111ff1262f045': 'USDFC',
+          '0xeb466342c4d449bc9f53a865d5cb90586f405215': 'axlUSDC',
+          '0x23b1e018f08bb982348b15a86ee926eebf7f4daa': 'Filecoin Pay',
+        },
+      }
+      function glanceParams(status, records, nowEpoch, epochTime, quarterStart) {
+        const now = nowEpoch(),
+          A = status.activationEpoch,
+          L = status.epochsPerQuarter,
+          sec = status.epochSeconds
+        const active = A && now >= A,
+          Q = active ? Math.floor((now - A) / L) + 1 : 0
+        const boundary = active ? quarterStart(Q) : Infinity // before activation every event applies from Q1
+        const label = (a) => {
+          const k = (KNOWN[status.network] ?? {})[a.toLowerCase()]
+          return `<code>${a.slice(0, 6)}…${a.slice(-4)}</code>${k ? ' ' + k : ''}`
+        }
+        const hours = (n) => {
+          const h = (n * sec) / 3600,
+            d = +(h / 24).toFixed(2)
+          return h >= 24 ? `${d} ${d === 1 ? 'day' : 'days'}` : `${+h.toFixed(2)} h`
+        }
+        const pick = (name) => {
+          const ev = records.filter((r) => r.kind === 'event' && r.name === name)
+          return {
+            cur: ev.filter((r) => r.epoch < boundary).at(-1),
+            next: ev.filter((r) => r.epoch >= boundary).at(-1),
+          }
+        }
+        const since = (r, fromNext) =>
+          !r
+            ? ''
+            : active
+              ? fromNext
+                ? `pending: applies from ${utc(epochTime(quarterStart(Q + 1)))}`
+                : `since ${utc(r.time)}`
+              : `set ${utc(r.time)}, applies from Q1`
+        const rows = []
+        const row = (name, value, when) =>
+          rows.push(`<tr><td>${name}</td><td>${value}</td><td class="muted">${when}</td></tr>`)
+        const lists = pick('AdmittedListsUpdated'),
+          price = pick('PricingParamsUpdated'),
+          gate = records.filter((r) => r.kind === 'event' && r.name === 'GateParamsSet').at(-1)
+        for (const [which, key] of [
+          ['cur', false],
+          ['next', true],
+        ]) {
+          const l = lists[which],
+            p = price[which]
+          if (l) {
+            row('Admitted stablecoins', l.fields.stablecoins.map(label).join('<br>'), since(l, key))
+            row('Admitted Filecoin Pay contracts', l.fields.filecoinPayContracts.map(label).join('<br>'), since(l, key))
+          }
+          if (p) {
+            const f = p.fields
+            row('MIN_LOT_FLOOR', scaled(f.minLotFloor, E18, 2) + ' USD', since(p, key))
+            row('MIN_LOT_ALPHA', `${f.minLotAlphaNum}/${f.minLotAlphaDen}`, since(p, key))
+            row('PRICE_BAND', `${f.priceBand} basis points = ${Number(f.priceBand) / 100}%`, since(p, key))
+            row(
+              'REGISTRATION_CUTOFF',
+              `${f.registrationCutoff} epochs = ${hours(Number(f.registrationCutoff))}`,
+              since(p, key),
+            )
+          }
+        }
+        if (!lists.cur && !lists.next) row('Admitted lists', 'none set', '')
+        if (!price.cur && !price.next) row('Pricing parameters', 'none set', '')
+        if (gate) {
+          const g = gate.fields.params
+          row(
+            'Gate parameters',
+            `target.base ${scaled(g.target.base, E18, 2)} USD · target.stepRatio ${scaled(g.target.stepRatio, E18, 2)} · steps ${g.steps}`,
+            `since ${utc(gate.time)}`,
+          )
+        } else
+          row(
+            'Gate parameters',
+            '<span id="gateParamsCell">as set at deployment (no GateParamsSet event yet)</span>',
+            '',
+          )
+        row('EPOCHS_PER_QUARTER', `${L} = ${hours(L)}`, 'deployments.json')
+        if (status.postPeriod)
+          row('POST_PERIOD', `${status.postPeriod} epochs = ${hours(status.postPeriod)}`, 'deployments.json')
+        if (status.verificationWindow)
+          row(
+            'VERIFICATION_WINDOW',
+            `${status.verificationWindow} epochs = ${hours(status.verificationWindow)}`,
+            'deployments.json',
+          )
+        if (status.swaTimelockEpochs)
+          row(
+            'SWA_TIMELOCK',
+            `${status.swaTimelockEpochs} epochs = ${hours(status.swaTimelockEpochs)}`,
+            'f02 state (Lotus params)',
+          )
+        $('glanceParams').innerHTML =
+          `<details class="row fold"><summary><b>Parameters in force</b></summary><div class="scroll"><table class="params">${rows.join('')}</table></div></details>`
+      }
 
-// Footnote: the SRA counts quarters from its activationEpoch (deployments.json); f02's ramp starts at stream 1's t_start,
-// set by the migration to the upgrade epoch + 1. FIP-0118 §2.4.10 expects them equal. A one-epoch difference changes
-// nothing on this page; more than that is worth a look.
-function footnote(live, status) {
-  const t = live.streams.find((s) => s.id === 1)?.weight.tStart
-  if (t === undefined || !status.activationEpoch) return
-  const d = Math.abs(t - status.activationEpoch)
-  const rel = d === 0 ? 'equal' : d === 1 ? 'one epoch apart, which changes nothing here' : `<span class="bad">${d} epochs apart, which is unexpected</span>`
-  $('foot').innerHTML = `Quarter numbers on this page follow FIP-0118 §2.2: Start(Q) = activationEpoch + (Q-1) · EPOCHS_PER_QUARTER, with activationEpoch ${status.activationEpoch} ` +
-    `from solstice deployments.json. Quarter Q's activity settles inside quarter Q+1, and the SRA's calls and events for it carry Q (submitShares(Q), SharesSubmitted(Q)); the SRA's internal quarter index (_quarterOf) counts from 0 at activation, one lower than the number here. ` +
-    `f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
-    `activationEpoch and t_start are ${rel}. FIP-0118 §2.4.10 expects them equal.`
-}
+      // Footnote: the SRA counts quarters from its activationEpoch (deployments.json); f02's ramp starts at stream 1's t_start,
+      // set by the migration to the upgrade epoch + 1. FIP-0118 §2.4.10 expects them equal. A one-epoch difference changes
+      // nothing on this page; more than that is worth a look.
+      function footnote(live, status) {
+        const t = live.streams.find((s) => s.id === 1)?.weight.tStart
+        if (t === undefined || !status.activationEpoch) return
+        const d = Math.abs(t - status.activationEpoch)
+        const rel =
+          d === 0
+            ? 'equal'
+            : d === 1
+              ? 'one epoch apart, which changes nothing here'
+              : `<span class="bad">${d} epochs apart, which is unexpected</span>`
+        $('foot').innerHTML =
+          `Quarter numbers on this page follow FIP-0118 §2.2: Start(Q) = activationEpoch + (Q-1) · EPOCHS_PER_QUARTER, with activationEpoch ${status.activationEpoch} ` +
+          `from solstice deployments.json. Quarter Q's activity settles inside quarter Q+1, and the SRA's calls and events for it carry Q (submitShares(Q), SharesSubmitted(Q)); the SRA's internal quarter index (_quarterOf) counts from 0 at activation, one lower than the number here. ` +
+          `f02's own ramp starts at t_start of stream 1, set by the migration to the upgrade epoch + 1: here ${t}. ` +
+          `activationEpoch and t_start are ${rel}. FIP-0118 §2.4.10 expects them equal.`
+      }
 
-// Filfox accepts both 0x transaction hashes and message CIDs. The host is set per network when the record loads.
-let explorer = 'https://calibration.filfox.info/en/message/'
-const msgLink = (id) => explorer + id
+      // Filfox accepts both 0x transaction hashes and message CIDs. The host is set per network when the record loads.
+      let explorer = 'https://calibration.filfox.info/en/message/'
+      const msgLink = (id) => explorer + id
 
-main().catch((err) => { $('head').textContent = `Could not load ${dir}: ${err.message}` })
+      main().catch((err) => {
+        $('head').textContent = `Could not load ${dir}: ${err.message}`
+      })
 
-if (ALERTS_URL) {
-  $('alerts').hidden = false
-  $('alertsForm').onsubmit = async (ev) => {
-    ev.preventDefault()
-    const f = new FormData(ev.target)
-    $('alertsMsg').textContent = 'sending…'
-    try {
-      const res = await fetch(ALERTS_URL.replace(/\/+$/, '') + '/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: f.get('email'), website: f.get('website') }) })
-      $('alertsMsg').textContent = (await res.json()).message ?? (res.ok ? 'Check your inbox.' : 'Could not subscribe.')
-    } catch { $('alertsMsg').textContent = 'Could not reach the alert service. Try again later.' }
-  }
-}
-</script>
-</body>
+      if (ALERTS_URL) {
+        $('alerts').hidden = false
+        $('alertsForm').onsubmit = async (ev) => {
+          ev.preventDefault()
+          const f = new FormData(ev.target)
+          $('alertsMsg').textContent = 'sending…'
+          try {
+            const res = await fetch(ALERTS_URL.replace(/\/+$/, '') + '/api/subscribe', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ email: f.get('email'), website: f.get('website') }),
+            })
+            $('alertsMsg').textContent =
+              (await res.json()).message ?? (res.ok ? 'Check your inbox.' : 'Could not subscribe.')
+          } catch {
+            $('alertsMsg').textContent = 'Could not reach the alert service. Try again later.'
+          }
+        }
+      }
+    </script>
+  </body>
 </html>
