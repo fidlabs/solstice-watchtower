@@ -27,8 +27,10 @@
   "wallets": {
     "initialOrchestrator": "0x97A90f5696be5E3C8d3752C92Adac287c2b4484e",
     "cranker (decentramike)": "0x170356558bd57623d3df9877319014ec9de6e263",
-    "cranker (watchtower backup)": "0x049Ba5f9551c4372E1F9dCde82146E39D6689c7E",
-    "claimer (watchtower backup)": "t17onisyvqkb5h6ix43jplk45x7xfpbydvs34encq"
+    "cranker (watchtower backup)": "0x1d6B8035a876671f6C3021c5b0901A7ceFff8aaF",
+    "claimer (watchtower backup)": "t1ndeh7cidtsmrkvri7o7qdgyhxo5jf4gzda2xuva",
+    "cranker (irenegia watchtower, previous)": "0x049Ba5f9551c4372E1F9dCde82146E39D6689c7E",
+    "claimer (irenegia watchtower, previous)": "t17onisyvqkb5h6ix43jplk45x7xfpbydvs34encq"
   },
   "crankDelayEpochs": 60,
   "dataDir": "site/data/calibnet",
