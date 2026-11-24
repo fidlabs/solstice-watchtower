@@ -66,6 +66,13 @@ jobs:
         continue-on-error: true
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      # Fee-auction check (bin/fees.js): the FIP-0118 FIL price from the Filecoin Pay fee auctions, FIL settled on bound
+      # pairs, self-bindings. Mainnet only (calibnet has no feeWatch). Fails only on a critical finding or an error.
+      - id: fees_mainnet
+        run: node bin/fees.js config/mainnet.json
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
       - id: read_calibnet
         run: node bin/reader.js config/calibnet.json
         continue-on-error: true
@@ -86,9 +93,9 @@ jobs:
           git push
       # watch_* fail when a call is overdue: that is the alert, already sent; the red run makes the Actions tab agree.
       - name: Fail the job if a step failed
-        if: ${{ steps.read_mainnet.outcome == 'failure' || steps.watch_mainnet.outcome == 'failure' || steps.read_calibnet.outcome == 'failure' || steps.watch_calibnet.outcome == 'failure' }}
+        if: ${{ steps.read_mainnet.outcome == 'failure' || steps.watch_mainnet.outcome == 'failure' || steps.fees_mainnet.outcome == 'failure' || steps.read_calibnet.outcome == 'failure' || steps.watch_calibnet.outcome == 'failure' }}
         run: |
-          echo "::error::read mainnet ${{ steps.read_mainnet.outcome }}, watch mainnet ${{ steps.watch_mainnet.outcome }}, read calibnet ${{ steps.read_calibnet.outcome }}, watch calibnet ${{ steps.watch_calibnet.outcome }}"
+          echo "::error::read mainnet ${{ steps.read_mainnet.outcome }}, watch mainnet ${{ steps.watch_mainnet.outcome }}, fees mainnet ${{ steps.fees_mainnet.outcome }}, read calibnet ${{ steps.read_calibnet.outcome }}, watch calibnet ${{ steps.watch_calibnet.outcome }}"
           exit 1
 
   backup:

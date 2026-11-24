@@ -17,6 +17,9 @@ A scheduled workflow (`.github/workflows/read.yml`, every 10 minutes, plus an ou
   it; `bin/watch.js` then checks the chain for overdue calls and alerts (`submitShares(q)` not landed
   `absenceAlertHours` after binding, critical past the backup delay or in the last week of the window; the gate check
   after `gateAlertHours`). Mainnet and calibnet are separate steps: one failing never skips the other.
+  On mainnet, `bin/fees.js` then recomputes the FIP-0118 FIL price (Section 2.3) from every Filecoin Pay fee-auction
+  claim, for each admitted stablecoin (USDFC and axlUSDC), and keeps it in `site/data/mainnet/fees.json`. See
+  [Fee-auction alerts](#fee-auction-alerts).
 - **backup** (holds the keys, cannot push, environment `production`): the backup cranker (`bin/crank.js`) sends
   `submitShares(q)` / `quarterlyGateCheck()` once the quarter has been bound for `crankDelayEpochs` (one day on mainnet)
   and nobody sent it, so the primary cranker (https://github.com/fidlabs/solstice-cranker) goes first. The Claim keeper
@@ -39,6 +42,30 @@ throttled per alert. `bin/watch.js` also sends a heartbeat each run, so the watc
 hours is an email. Set `ALERTS_URL` in `site/index.html` to show the sign-up form on the page, and the variable
 `WATCHTOWER_PAGE_URL` so emails link to the hosted page.
 
+### Fee-auction alerts
+
+FIP-0118 values FIL settled on a bound payer/operator pair at the rate implied by Filecoin Pay's fee auctions: a claim
+pays `msg.value` FIL for a lot of an admitted stablecoin, and the first five claims of at least `MIN_LOT` seed a median
+reference; after that a claim prices only within `PRICE_BAND` (30%) of the last qualifying one. The auction's price is
+per claim, not per dollar, and the buyer picks both the lot and the FIL paid, so a claim can print far from market. On
+mainnet three of the five seed claims came from the axlUSDC auction and the reference has been about $1,500/FIL since
+2026-11-11. `bin/fees.js` alerts on:
+
+| Severity                    | When                                                                                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| info, Slack only            | every claim: token, lot, FIL paid, implied $/FIL, and whether it seeds, qualifies, is outside the band or is dust                                                       |
+| warn                        | a claim that leaves part of the pot, pays more than `overpayPercent` above the auction price, or comes from a wallet not in `knownClaimers`                             |
+| warn, weekly while it holds | the reference is outside `filUsdSane`; a pot is at least `potAlertUsd` (with what taking it costs); the two auctions' last claims are more than `divergenceRatio` apart |
+| warn                        | a binding whose payer is its own operator; a FIL rail opened on a bound pair, or found on a pair when it is bound                                                       |
+| warn (email)                | `AdmittedListsUpdated` or `PricingParamsUpdated` from the SRA: the pricing inputs change from the next quarter                                                          |
+| critical                    | FIL settled on a bound pair (`RailSettled`, `RailOneTimePaymentProcessed`), with its value at the current reference                                                     |
+
+Claims are found by tracing (`trace_block`), because `burnForFees` emits no event and a claim inside a multicall
+carries its FIL in an internal call. The node keeps traces for 14 days, so `fees.json` was seeded with the quarter-1
+claims before epoch 6540000 from transactions decoded on Blockscout; if the job stops for longer than that, a critical
+alert names the epochs it could not read. `MIN_LOT` from quarter 2 depends on quarter 1's bound volume, which is not
+computed yet: from quarter 2 claims are marked provisional and use `MIN_LOT_FLOOR`.
+
 Needs Node.js 22 or newer.
 
 | Command                                                                           | What it does                                                                                                                    |
@@ -46,6 +73,7 @@ Needs Node.js 22 or newer.
 | `npm ci`                                                                          | Installs the three libraries (`viem`, `iso-filecoin`, `@ipld/dag-cbor`). Once.                                                  |
 | `npm run read`                                                                    | One run of the reader against calibnet. Only reads from the public RPC endpoint. Appends to `site/data/calibnet/records.jsonl`. |
 | `node bin/watch.js config/mainnet.json`                                           | The absence check, once. Writes `site/data/mainnet/alerts.json`.                                                                |
+| `node bin/fees.js config/mainnet.json`                                            | The fee-auction check, once. Writes `site/data/mainnet/fees.json`. `FEES_MAX_EPOCHS` raises the 2,880 epochs read per run.      |
 | `node bin/crank.js config/mainnet.json` / `node bin/claim.js config/mainnet.json` | The backup cranker / Claim keeper, once. Without a key, a dry run that sends nothing.                                           |
 | `node bin/newkey.js mainnet <file>`                                               | A new f1 key for the Claim keeper, written to a 0600 file; prints only the address.                                             |
 | `npm run page`                                                                    | Serves the page at http://localhost:8000. Stop with Ctrl+C.                                                                     |

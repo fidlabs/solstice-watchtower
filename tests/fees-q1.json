@@ -1,0 +1,112 @@
+[
+  {
+    "epoch": 6477570,
+    "tx": "0x68ee5043d52564b14ca272d2724151aa9f9b0632e7c89af36d85ee039cbf1681",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0x80b98d3aa09ffff255c3ba4a241111ff1262f045",
+    "symbol": "USDFC",
+    "lot": "2596752623330468150",
+    "usd": "2596752623330468150",
+    "fil": "2120299024563276293"
+  },
+  {
+    "epoch": 6479540,
+    "tx": "0x49868230185fc2f2589e86584b4e9336a95f2957b13d50b1fc28f91e8620a83c",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "11558695",
+    "usd": "11558695000000000000",
+    "fil": "1899797535876701"
+  },
+  {
+    "epoch": 6499621,
+    "tx": "0x0fc2ce0fec1939a0d285fa6677d374f5f0cd806cc52b07963921b59e5c7308e5",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "11517645",
+    "usd": "11517645000000000000",
+    "fil": "1910146085957082"
+  },
+  {
+    "epoch": 6499667,
+    "tx": "0x4a4c714f9df9aba86134b64643d4d56b9d423339ad6e2938ae945fbce26829dc",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0x80b98d3aa09ffff255c3ba4a241111ff1262f045",
+    "symbol": "USDFC",
+    "lot": "1961601230172418735",
+    "usd": "1961601230172418735",
+    "fil": "1856009698893704329"
+  },
+  {
+    "epoch": 6511207,
+    "tx": "0x2c26cd0e551d470583ab186e9446994e296e1d81effc309881b1bfb0b994ceb8",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "6643383",
+    "usd": "6643383000000000000",
+    "fil": "3444460936010354"
+  },
+  {
+    "epoch": 6516251,
+    "tx": "0xc2b881b4fd25f0960147d615bc6f725bffbb0851ed0fecf9ad4f9fd2fb33ffbe",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0x80b98d3aa09ffff255c3ba4a241111ff1262f045",
+    "symbol": "USDFC",
+    "lot": "2417523446707169277",
+    "usd": "2417523446707169277",
+    "fil": "2374234090129242091"
+  },
+  {
+    "epoch": 6519871,
+    "tx": "0x01470e89ab4df2b91607afaf932620d7ba0edf4c4c41ff747aa2a41a94b8f39b",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "5138679",
+    "usd": "5138679000000000000",
+    "fil": "7593966386960213"
+  },
+  {
+    "epoch": 6540100,
+    "tx": "0xed2a33838e4c662b53bfeba86d68fa3860b589c4db6e2de52585bd38a121eeea",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "11618606",
+    "usd": "11618606000000000000",
+    "fil": "7558020203496158"
+  },
+  {
+    "epoch": 6540338,
+    "tx": "0x8f41fff85d1b0321197888be3cd8eda2c3087742298ddc145d7953e1b5a2c8f2",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0x80b98d3aa09ffff255c3ba4a241111ff1262f045",
+    "symbol": "USDFC",
+    "lot": "1583137871880112426",
+    "usd": "1583137871880112426",
+    "fil": "1811624072173322144"
+  },
+  {
+    "epoch": 6557313,
+    "tx": "0xbc0da7181310c92552ee6bb3c6a787f6aad6040d45c9d3e47ae43cb03a13a9e8",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0x80b98d3aa09ffff255c3ba4a241111ff1262f045",
+    "symbol": "USDFC",
+    "lot": "4007248709939230321",
+    "usd": "4007248709939230321",
+    "fil": "2257993841250953326"
+  },
+  {
+    "epoch": 6560080,
+    "tx": "0x0cbaee493d39288c9005d93dc175d9f211dbc5df3c2d3b56184e29e78f420bab",
+    "contract": "0x23b1e018f08bb982348b15a86ee926eebf7f4daa",
+    "token": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+    "symbol": "axlUSDC",
+    "lot": "11462001",
+    "usd": "11462001000000000000",
+    "fil": "7652151929652038"
+  }
+]

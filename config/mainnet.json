@@ -33,5 +33,28 @@
   "claimMaxFeeFil": "0.05",
   "claimEveryHours": 24,
   "absenceAlertHours": 6,
-  "gateAlertHours": 48
+  "gateAlertHours": 48,
+  "feeWatch": {
+    "filecoinPay": "0x23b1e018F08BB982348b15a86ee926eEBf7F4DAa",
+    "tokens": {
+      "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045": {
+        "symbol": "USDFC",
+        "decimals": 18
+      },
+      "0xEB466342C4d449BC9f53A865D5Cb90586f405215": {
+        "symbol": "axlUSDC",
+        "decimals": 6
+      }
+    },
+    "knownClaimers": ["0x81f6A8aA5F7323D76d233946FD52cd3879b81608", "0x2153bC1db3dD69f80EC166680C85D1032F5C67C2"],
+    "startEpoch": 6470280,
+    "filUsdSane": [0.2, 200],
+    "potAlertUsd": 50,
+    "divergenceRatio": 10,
+    "partialToleranceUsd": 0.05,
+    "overpayPercent": 5,
+    "statusRepeatHours": 168,
+    "explorerTx": "https://filfox.info/en/message/",
+    "note": "bin/fees.js: FIP-0118 FIL price recomputed from the fee auctions of the admitted Filecoin Pay contract (the admitted lists and pricing parameters themselves are read from the SRA events in records.jsonl). filUsdSane: a reference outside it is alerted weekly. potAlertUsd: a pot at least this large is alerted weekly with what it costs to take. divergenceRatio: the two auctions' last prints further apart than this. partialToleranceUsd / overpayPercent: how much of the pot a claim may leave, and how far above the auction price it may pay, before it counts as a chosen print. knownClaimers: the weekly fee harvesters seen since 2026-09; a claim by anyone else is flagged. The node keeps traces for 14 days, so fees.json was seeded up to epoch 6539999 from claims decoded on Blockscout."
+  }
 }
